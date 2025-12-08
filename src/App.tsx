@@ -21,6 +21,17 @@ const supabaseAnonKey =
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const triggerDownload = (url: string, filename: string) => {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+};
+
+//const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
+
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>('IDLE');
@@ -274,11 +285,11 @@ function App() {
                 </span>
               </div>
               <div className="space-y-0.5 mt-1">
-                <p className="text-[13px] text-emerald-300/90">
-                  Encrypt files in your browser and share them with a private link.
+                <p className="text-[13px] text-emerald-300/80">
+                  No accounts, no tracking, no server-side decryption or key recovery. 
                 </p>
                 <p className="text-[13px] text-emerald-300/80">
-                  No accounts, no tracking, no server-side decryption or key recovery.
+                  Processing: happens locally in your browser.
                 </p>
               </div>
             </div>
@@ -305,14 +316,11 @@ function App() {
                 </span>
               </div>
 
-              <p className="console-line text-emerald-300/90 mb-1 text-[13px]">
-                &gt; encryption: AES-256-GCM · new random key per file
-              </p>
               <p className="console-line text-emerald-300/85 mb-1 text-[13px]">
-                &gt; processing: happens locally in your browser
+                &gt; encrypt files in your browser and share them with a private link
               </p>
               <p className="console-line text-emerald-300/80 mb-2 text-[13px]">
-                &gt; recovery: if you lose the key, we cannot restore the data
+                &gt; encryption AES-256-GCM · new random key per file
               </p>
               <div className="hr-line" />
 
@@ -417,13 +425,14 @@ function App() {
                       <p className="text-[13px] text-emerald-200/90 mb-1">
                         Download the encrypted file (local backup):
                       </p>
-                      <a
-                        href={downloadUrl}
-                        download={`${file?.name || 'file'}.enc`}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-black/40 border border-emerald-700 text-[13px] hover:bg-black/60"
+                      <button
+                        onClick={() => {
+                          if (!downloadUrl) return;
+                          triggerDownload(downloadUrl, `${file?.name || 'file'}.enc`);
+                        }}
                       >
                         Download encrypted file
-                      </a>
+                      </button>
                     </div>
                   )}
 
@@ -640,13 +649,14 @@ function App() {
 
         <div className="mt-1 text-center text-[13px] text-emerald-300/80 leading-relaxed px-1">
           <p className="mb-1">
-            Encryption and decryption happen entirely inside your browser. The server
-            only ever sees encrypted blobs, never your key or plaintext file.
+            Encryption and decryption happen entirely inside your browser.
+            The server only ever sees encrypted blobs, never your key or plaintext file.
           </p>
           <p className="mb-1">
-            Large files put more stress on your CPU, RAM and browser: consider staying
-            below 1–2 GB or splitting/compressing data before encrypting it for a more
-            stable experience.
+            If you lose the key or the link, the data cannot be recovered by us or by anyone else. 
+          </p>
+          <p className="mb-1">
+            This is by design: no recovery, no logs, no backdoors.
           </p>
         </div>
       </div>
