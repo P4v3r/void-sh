@@ -1,10 +1,20 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import App from './App';
+import DownloadPage from './DownloadPage';
+import './index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <Routes>
+        {/* Home: pagina per cifrare e caricare il file */}
+        <Route path="/" element={<App />} />
+
+        {/* Pagina per scaricare/decifrare il file da un link condiviso */}
+        <Route path="/d/:objectPath" element={<DownloadPage />} />
+      </Routes>
+    </BrowserRouter>
+  </React.StrictMode>,
+);

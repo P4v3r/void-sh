@@ -1,7 +1,18 @@
 import React, { useState } from 'react';
 import { Lock, Upload, CheckCircle2 } from 'lucide-react';
+import { encryptFile } from './crypto';
+import { createClient } from '@supabase/supabase-js';
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase environment variables are missing');
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
@@ -9,12 +20,21 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [isHover, setIsHover] = useState(false);
 
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [keyString, setKeyString] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsHover(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0]);
       setStatus('READY');
+      setDownloadUrl(null);
+      setKeyString(null);
+      setShareLink(null);
+      setError(null);
     }
   };
 
@@ -22,18 +42,63 @@ function App() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setStatus('READY');
+      setDownloadUrl(null);
+      setKeyString(null);
+      setShareLink(null);
+      setError(null);
     }
   };
 
-  const startEncrypt = () => {
+  const startEncrypt = async () => {
     if (!file) return;
-    setStatus('ENCRYPTING');
-    // TODO: replace with real encryption logic
-    setTimeout(() => setStatus('DONE'), 1500);
+    try {
+      setStatus('ENCRYPTING');
+      setError(null);
+      setCopied(false);
+
+      // 1) CIFRA NEL BROWSER
+      const { encryptedBlob, keyString } = await encryptFile(file);
+
+      // URL locale (non obbligatorio, ma utile)
+      const localUrl = URL.createObjectURL(encryptedBlob);
+      setDownloadUrl(localUrl);
+      setKeyString(keyString);
+
+      // 2) UPLOAD SU SUPABASE STORAGE (bucket: vault-files)
+      const objectPath = `files/${Date.now()}-${file.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vault-files')
+        .upload(objectPath, encryptedBlob, {
+          contentType: 'application/octet-stream',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error(uploadError);
+        setError('Upload failed. Encrypted file was not stored on the server.');
+        setStatus('READY');
+        return;
+      }
+
+      // 3) CREA LINK /d/...#chiave
+      const origin = window.location.origin;
+      const link = `${origin}/d/${encodeURIComponent(objectPath)}#${encodeURIComponent(
+        keyString,
+      )}`;
+
+      setShareLink(link);
+      setStatus('DONE');
+    } catch (err) {
+      console.error(err);
+      setError('Encryption failed. Please try with a different file.');
+      setStatus('READY');
+    }
   };
 
   const copyLink = () => {
-    navigator.clipboard.writeText('https://voidfiles.xyz/d/x91-safe#key_812739');
+    if (!shareLink) return;
+    navigator.clipboard.writeText(shareLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };
@@ -43,6 +108,10 @@ function App() {
     setStatus('IDLE');
     setCopied(false);
     setIsHover(false);
+    setDownloadUrl(null);
+    setKeyString(null);
+    setShareLink(null);
+    setError(null);
   };
 
   return (
@@ -60,7 +129,6 @@ function App() {
                   alpha
                 </span>
               </div>
-              {/* descrizione sintetica, senza slogan ridondanti */}
               <div className="space-y-0.5 mt-1">
                 <p className="text-[13px] text-emerald-300/90">
                   Encrypt files in your browser and share them with a private link.
@@ -80,10 +148,9 @@ function App() {
 
         {/* CONTENUTO PRINCIPALE */}
         <main className="mt-5 mb-10 flex justify-start">
-          <div className="w-full max-w-md mx-auto">
+          <div className="w-full max-w-xl mx-auto">
             {/* PANNELLO FILE */}
-            <div className="panel rounded-md p-5">
-              {/* riga di stato in alto nel pannello */}
+            <div className="panel rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[13px] text-emerald-300 font-mono">[ FILE_AREA ]</span>
                 <span className="text-[12px] text-emerald-500 font-mono">
@@ -94,7 +161,6 @@ function App() {
                 </span>
               </div>
 
-              {/* info tecniche, senza ripetere le frasi dell'header */}
               <p className="console-line text-emerald-300/90 mb-1 text-[13px]">
                 &gt; encryption: AES-256-GCM · new random key per file
               </p>
@@ -106,7 +172,6 @@ function App() {
               </p>
               <div className="hr-line" />
 
-              {/* DROP AREA */}
               {(status === 'IDLE' || status === 'READY') && (
                 <div
                   className={
@@ -131,7 +196,6 @@ function App() {
                       <p className="text-emerald-300/75 text-[13px] mt-1">
                         or click inside this area to select a file from your device
                       </p>
-                      {/* input solo nell’area file */}
                       <input
                         type="file"
                         className="absolute inset-0 opacity-0 cursor-pointer"
@@ -156,7 +220,6 @@ function App() {
                 </div>
               )}
 
-              {/* AZIONI / STATI SOTTO LA DROP AREA */}
               {status === 'READY' && file && (
                 <div className="mt-4 space-y-2">
                   <p className="text-[13px] text-emerald-200/90">
@@ -164,14 +227,14 @@ function App() {
                   </p>
                   <div className="flex items-center justify-between gap-3">
                     <button
-                      className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] font-semibold bg-emerald-500 text-black hover:bg-emerald-400"
+                      className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 font-semibold bg-emerald-500 text-black hover:bg-emerald-400"
                       onClick={startEncrypt}
                     >
                       <Lock size={15} />
                       <span>Encrypt and create link</span>
                     </button>
                     <button
-                      className="btn btn-ghost text-[13px] px-3 py-2"
+                      className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/70 transition-colors"
                       onClick={reset}
                     >
                       Clear and choose another file
@@ -209,16 +272,22 @@ function App() {
                     <div className="flex items-center gap-2">
                       <div className="flex-1 border border-emerald-700/80 px-2 py-1.5 overflow-hidden bg-black/30 rounded">
                         <span className="text-[13px] truncate">
-                          https://voidfiles.xyz/d/x91-safe#key_812739
+                          {shareLink ?? 'Link not available'}
                         </span>
                       </div>
                       <button
-                        className="btn text-[13px] px-3 py-2 font-semibold bg-emerald-500 text-black hover:bg-emerald-400"
+                        className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 font-semibold bg-emerald-500 text-black hover:bg-emerald-400"
                         onClick={copyLink}
+                        disabled={!shareLink}
                       >
                         {copied ? 'Copied' : 'Copy link'}
                       </button>
                     </div>
+                    {keyString && (
+                      <div className="mt-2 text-[12px] text-emerald-300/80 break-all">
+                        Key (keep this secret, without it the file is lost): {keyString}
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-2">
@@ -226,7 +295,7 @@ function App() {
                       When you are finished with this file:
                     </p>
                     <button
-                      className="btn btn-ghost text-[13px] px-3 py-2"
+                      className="inline-flex items-center justify-center text-[13px] px-3 py-2 rounded-md border border-emerald-700 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/70 transition-colors"
                       onClick={reset}
                     >
                       Start again with a new file
@@ -235,7 +304,6 @@ function App() {
                 </div>
               )}
 
-              {/* PICCOLA RIGA DI LOG IN FONDO */}
               <div className="mt-5 hr-line" />
               <div className="mt-2">
                 {status === 'IDLE' && (
@@ -258,18 +326,25 @@ function App() {
                     &gt; encryption done · server never sees your key
                   </p>
                 )}
+                {error && (
+                  <p className="console-line text-[13px] text-red-400">
+                    &gt; error: {error}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* NOTICE SOTTO AL PANNELLO */}
             <div className="mt-5 text-center text-[13px] text-emerald-300/80 leading-relaxed px-1">
               <p className="mb-1">
                 Encryption happens entirely inside your browser. The server only receives
                 encrypted data, never your key or plaintext file.
               </p>
-              <p>
+              <p className="mb-1">
                 If you lose the key or the link, the data cannot be recovered by us or by
-                anyone else. This is by design: no recovery, no logs, no backdoors.
+                anyone else.
+              </p>
+              <p className="mb-1">
+                This is by design: no recovery, no logs, no backdoors.
               </p>
             </div>
           </div>
