@@ -7,7 +7,7 @@ type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
 type Mode = 'LOCAL_ONLY' | 'UPLOAD';
 
 // Limite SOLO per modalità con upload (100 MB qui, puoi modificarlo)
-const MAX_UPLOAD_MB = 100;
+const MAX_UPLOAD_MB = 50;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
 // Limite di sicurezza assoluto per qualsiasi operazione in browser (es. 2 GB)
