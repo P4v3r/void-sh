@@ -20,7 +20,7 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [isHover, setIsHover] = useState(false);
 
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  //const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [keyString, setKeyString] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ function App() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0]);
       setStatus('READY');
-      setDownloadUrl(null);
+      //setDownloadUrl(null);
       setKeyString(null);
       setShareLink(null);
       setError(null);
@@ -42,7 +42,7 @@ function App() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setStatus('READY');
-      setDownloadUrl(null);
+      //setDownloadUrl(null);
       setKeyString(null);
       setShareLink(null);
       setError(null);
@@ -60,8 +60,8 @@ function App() {
       const { encryptedBlob, keyString } = await encryptFile(file);
 
       // URL locale (non obbligatorio, ma utile)
-      const localUrl = URL.createObjectURL(encryptedBlob);
-      setDownloadUrl(localUrl);
+      //const localUrl = URL.createObjectURL(encryptedBlob);
+      //setDownloadUrl(localUrl);
       setKeyString(keyString);
 
       // 2) UPLOAD SU SUPABASE STORAGE (bucket: vault-files)
@@ -108,7 +108,7 @@ function App() {
     setStatus('IDLE');
     setCopied(false);
     setIsHover(false);
-    setDownloadUrl(null);
+    //setDownloadUrl(null);
     setKeyString(null);
     setShareLink(null);
     setError(null);
