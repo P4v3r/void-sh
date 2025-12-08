@@ -2,98 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Monochrome terminal-inspired palette. [web:116][web:125] */
 :root {
-  --accent-main: #22c55e; /* modern green accent */
-  --accent-soft: #16a34a;
-  --bg-main: #0b0f19;     /* dark bluish background, modern terminal feel */
-  --bg-panel: #111827;    /* slightly lighter panels */
-  --border-soft: #1f2937;
+  --bg-main: #050608;
+  --bg-panel: #080a0d;
+  --border-soft: #1f2933;
+  --text-main: #e5e7eb;
+  --text-muted: #9ca3af;
+  --accent: #a3e635; /* soft terminal green */
 }
 
 body {
   background-color: var(--bg-main);
-  color: #e5e7eb; /* light gray text */
+  color: var(--text-main);
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   overflow-x: hidden;
 }
 
-/* Slight glow for key elements */
-.text-glow {
-  text-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
-}
-
-/* Panel styled like a modern terminal window */
-.cyber-border {
+/* Pannello principale, semplice */
+.panel {
   border-radius: 0.5rem;
   border: 1px solid var(--border-soft);
-  background: radial-gradient(circle at top left, rgba(34,197,94,0.08), transparent 55%),
-              radial-gradient(circle at bottom right, rgba(59,130,246,0.12), transparent 55%),
-              var(--bg-panel);
-  box-shadow:
-    0 18px 40px rgba(0,0,0,0.75),
-    0 0 0 1px rgba(15,23,42,0.9);
-  position: relative;
+  background-color: var(--bg-panel);
 }
 
-/* Small accent bars on edges */
-.cyber-border::before,
-.cyber-border::after {
-  content: '';
-  position: absolute;
-  width: 40px;
-  height: 2px;
-  background: linear-gradient(to right, var(--accent-main), transparent);
-  opacity: 0.6;
-}
-.cyber-border::before {
-  top: 0;
-  left: 12px;
-}
-.cyber-border::after {
-  bottom: 0;
-  right: 12px;
-  transform: rotate(180deg);
+/* Titolo leggermente in evidenza, ma senza glow esagerato */
+.title-strong {
+  letter-spacing: -0.04em;
 }
 
-/* Top bar styled like a GNOME/Konsole window */
-.window-chrome {
-  border-bottom: 1px solid rgba(31,41,55,0.9);
-  padding-bottom: 0.75rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  justify-content: space-between;
-}
-
-.window-dots {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.window-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-}
-
-.window-dot.red {
-  background: #f97373;
-}
-.window-dot.yellow {
-  background: #facc15;
-}
-.window-dot.green {
-  background: #22c55e;
-}
-
-/* Blinking shell-like cursor */
+/* Cursore semplice che lampeggia */
 .cursor-blink {
   display: inline-block;
-  width: 8px;
-  height: 1.1em;
-  background: var(--accent-main);
+  width: 7px;
+  height: 1.05em;
+  background: var(--accent);
   margin-left: 4px;
   animation: blink 1s step-end infinite;
   vertical-align: text-bottom;
