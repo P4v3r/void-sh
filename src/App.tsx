@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { Lock, Upload, CheckCircle2 } from 'lucide-react';
 import { encryptFile } from './crypto';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase environment variables are missing');
+let supabase: SupabaseClient | null = null;
+
+if (supabaseUrl && supabaseAnonKey) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+} else {
+  console.error('Supabase environment variables are missing in this environment');
 }
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
@@ -51,6 +53,12 @@ function App() {
 
   const startEncrypt = async () => {
     if (!file) return;
+
+    if (!supabase) {
+      setError('Server configuration error: storage is not available right now.');
+      return;
+    }
+
     try {
       setStatus('ENCRYPTING');
       setError(null);

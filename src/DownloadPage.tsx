@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
 import { decryptFile } from './crypto';
 import { Lock, Download } from 'lucide-react';
 
-// crea client Supabase (stessa logica di App.tsx)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+let supabase: SupabaseClient | null = null;
+
+if (supabaseUrl && supabaseAnonKey) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+} else {
+  console.error('Supabase environment variables are missing in this environment');
+}
 
 function DownloadPage() {
   const { objectPath } = useParams(); // viene da /d/:objectPath
@@ -33,10 +40,17 @@ function DownloadPage() {
           return;
         }
 
+        if (!supabase) {
+          setError('Server configuration error: storage is not available right now.');
+          setStatus('ERROR');
+          return;
+        }
+
         // 2) scarica il blob cifrato da Supabase
         const { data, error: downloadError } = await supabase.storage
           .from('vault-files')
           .download(objectPath);
+
 
         if (downloadError || !data) {
           console.error(downloadError);
