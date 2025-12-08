@@ -8,6 +8,9 @@ type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
+console.log('VITE_SUPABASE_URL =', supabaseUrl);
+console.log('VITE_SUPABASE_ANON_KEY present =', !!supabaseAnonKey);
+
 let supabase: SupabaseClient | null = null;
 
 if (supabaseUrl && supabaseAnonKey) {
