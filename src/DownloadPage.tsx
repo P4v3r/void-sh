@@ -3,18 +3,23 @@ import { useParams } from 'react-router-dom';
 import { decryptFile } from './crypto';
 import { Lock, Download } from 'lucide-react';
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient} from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+//const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+//const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-let supabase: SupabaseClient | null = null;
+const supabaseUrl = 'https://rsnjdhkrgtuepivllvux.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzbmpkaGtyZ3R1ZXBpdmxsdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxODExNTEsImV4cCI6MjA4MDc1NzE1MX0.WKxJB0TMJw3_zBvQsI3vpQxWbrT824OzdHtefgnNvPo';
 
-if (supabaseUrl && supabaseAnonKey) {
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+//let supabase: SupabaseClient | null = null;
+
+/*if (supabaseUrl && supabaseAnonKey) {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
 } else {
   console.error('Supabase environment variables are missing in this environment');
-}
+}*/
 
 function DownloadPage() {
   const { objectPath } = useParams(); // viene da /d/:objectPath

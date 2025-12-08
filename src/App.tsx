@@ -1,23 +1,29 @@
 import React, { useState } from 'react';
 import { Lock, Upload, CheckCircle2 } from 'lucide-react';
 import { encryptFile } from './crypto';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+//import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient} from '@supabase/supabase-js';
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+//const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+//const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+const supabaseUrl = 'https://rsnjdhkrgtuepivllvux.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzbmpkaGtyZ3R1ZXBpdmxsdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxODExNTEsImV4cCI6MjA4MDc1NzE1MX0.WKxJB0TMJw3_zBvQsI3vpQxWbrT824OzdHtefgnNvPo';
 
 const supabaseUrlPresent = !!supabaseUrl;
 const supabaseAnonPresent = !!supabaseAnonKey;
 
-let supabase: SupabaseClient | null = null;
+//let supabase: SupabaseClient | null = null;
 
-if (supabaseUrl && supabaseAnonKey) {
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+/*if (supabaseUrl && supabaseAnonKey) {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
 } else {
   console.error('Supabase environment variables are missing in this environment');
-}
+}*/
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
@@ -147,7 +153,7 @@ function App() {
                 <p className="text-[13px] text-emerald-300/80">
                   No accounts, no tracking, no server-side decryption or key recovery.
                 </p>
-                
+
                 {/* DEBUG ENV – togli dopo i test */}
                 <div className="mt-2 text-[11px] text-red-400/80">
                   <p>DEBUG SUPABASE_URL: {supabaseUrlPresent ? 'OK' : 'MANCANTE'}</p>
