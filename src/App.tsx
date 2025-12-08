@@ -21,23 +21,6 @@ const supabaseAnonKey =
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const sanitizeFilename = (name: string): string => {
-  // prendi solo il nome, senza eventuali path
-  const base = name.split(/[\\/]/).pop() || 'file';
-
-  // rimuovi accenti (é -> e) usando Unicode normalize
-  const withoutAccents = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-
-  // sostituisci tutto ciò che NON è [a-zA-Z0-9._-] con "_"
-  const safe = withoutAccents.replace(/[^a-zA-Z0-9._-]/g, '_');
-
-  // comprimi underscore multipli e togli underscore a inizio/fine
-  const cleaned = safe.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-
-  // fallback se per assurdo è vuoto
-  return cleaned || 'file.bin';
-};
-
 const isIOSLike = () =>
   /iP(hone|od|ad)/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
