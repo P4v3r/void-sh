@@ -234,7 +234,7 @@ function App() {
                       <span>Encrypt and create link</span>
                     </button>
                     <button
-                      className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/70 transition-colors"
+                      className="btn inline-flex items-center gap-3 px-3 py-2 text-[13px] rounded-md border border-emerald-700 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/70 transition-colors"
                       onClick={reset}
                     >
                       Clear and choose another file
