@@ -21,7 +21,17 @@ const supabaseAnonKey =
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const isIOSLike = () =>
+  /iP(hone|od|ad)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+
 const triggerDownload = (url: string, filename: string) => {
+  // iOS: meglio aprire in una nuova scheda
+  if (isIOSLike()) {
+    window.open(url, '_blank');
+    return;
+  }
+
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
@@ -29,8 +39,6 @@ const triggerDownload = (url: string, filename: string) => {
   a.click();
   a.remove();
 };
-
-//const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
@@ -426,10 +434,13 @@ function App() {
                         Download the encrypted file (local backup):
                       </p>
                       <button
+                        type="button"
                         onClick={() => {
                           if (!downloadUrl) return;
-                          triggerDownload(downloadUrl, `${file?.name || 'file'}.enc`);
+                          const name = `${file?.name || 'file'}.enc`;
+                          triggerDownload(downloadUrl, name);
                         }}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-black/40 border border-emerald-700 text-[13px] hover:bg-black/60"
                       >
                         Download encrypted file
                       </button>
@@ -616,10 +627,12 @@ function App() {
                     <p className="text-[13px] text-emerald-200/90 mb-1">
                       Decryption successful. Download the original file:
                     </p>
-                    <a
-                      href={decryptedUrl}
-                      download={decryptedFileName}
+                    <button
+                      type="button"
                       onClick={() => {
+                        if (!decryptedUrl) return;
+                        triggerDownload(decryptedUrl, decryptedFileName || 'decrypted');
+                        // se vuoi resettare subito dopo:
                         setTimeout(() => {
                           resetDecrypt();
                         }, 0);
@@ -627,7 +640,7 @@ function App() {
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-black/40 border border-emerald-700 text-[13px] hover:bg-black/60"
                     >
                       Download decrypted file
-                    </a>
+                    </button>
                   </div>
                 )}
 
