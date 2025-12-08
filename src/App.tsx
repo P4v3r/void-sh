@@ -1,188 +1,235 @@
 import React, { useState } from 'react';
-import { ShieldCheck, UploadCloud, Lock, ArrowRight, Zap, Copy, CheckCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Shield, Upload, Lock, Eye, Terminal, FileCheck, Skull } from 'lucide-react';
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [status, setStatus] = useState<'IDLE' | 'ENCRYPTING' | 'DONE'>('IDLE');
-  const [copied, setCopied] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => setIsDragOver(false);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0]);
     }
   };
 
-  const startProcess = () => {
-    if (!file) return;
-    setStatus('ENCRYPTING');
-    setTimeout(() => setStatus('DONE'), 2500); // Simulazione più lunga per l'effetto
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText("https://void.sh/d/x91_safe#key_812");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // TODO: later you will replace this with real client-side encryption logic
+  const startEncryption = () => {
+    if (!file) return;
+    setStatus('ENCRYPTING');
+    setTimeout(() => {
+      setStatus('DONE');
+    }, 2000);
+  };
+
+  const resetAll = () => {
+    setFile(null);
+    setStatus('IDLE');
   };
 
   return (
-    <div className="min-h-screen flex flex-col relative text-white antialiased selection:bg-indigo-500/30">
-      <div className="aurora-bg" />
-
-      <nav className="w-full max-w-6xl mx-auto p-6 flex justify-between items-center z-10">
-        <div className="flex items-center gap-2 font-semibold tracking-tight text-xl">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Lock size={16} className="text-white" />
+    <div className="min-h-screen px-4 md:px-8 py-6 flex flex-col selection:bg-emerald-900/60 selection:text-white">
+      {/* Header styled like a modern Linux desktop app */}
+      <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 border-b border-slate-800 pb-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2">
+            <Terminal size={28} className="text-emerald-400" />
+            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-glow">
+              Void.sh
+            </h1>
           </div>
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
-            Void.sh
-          </span>
-        </div>
-        <div className="hidden md:flex gap-6 text-sm text-white/50 font-medium">
-          <span className="hover:text-white transition-colors cursor-pointer">Manifesto</span>
-          <span className="hover:text-white transition-colors cursor-pointer">Security</span>
-          <span className="hover:text-white transition-colors cursor-pointer">GitHub</span>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 z-10">
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-10 max-w-2xl"
-        >
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/40">
-            Invisible Storage.
-          </h1>
-          <p className="text-lg text-white/40 font-light">
-            Client-side encryption. Zero knowledge. <br className="hidden md:block"/>
-            The file never leaves your device unencrypted.
+          <p className="text-xs text-slate-400 mt-1">
+            secure file operations · client-side encryption · zero-knowledge
           </p>
-        </motion.div>
+        </div>
+        <div className="text-xs text-right text-slate-500 space-y-0.5">
+          <p>SESSION: #root@void-shell</p>
+          <p>BACKEND: static (no logs)</p>
+          <p>MODE: private · onion-ready</p>
+        </div>
+      </header>
 
-        <motion.div 
-          layout
-          className="w-full max-w-md glass-panel rounded-3xl p-1 overflow-hidden relative group"
-        >
-
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-3xl opacity-0 group-hover:opacity-100 transition duration-500 blur-lg" />
+      {/* Main layout */}
+      <main className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full">
+        <div className="w-full cyber-border p-4 md:p-6 lg:p-8">
           
-          <div className="relative bg-[#0a0a0a]/80 rounded-[22px] p-8 h-[400px] flex flex-col items-center justify-center">
-            
-            <AnimatePresence mode="wait">
-              {status === 'IDLE' && (
-                <motion.div 
-                  key="idle"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="w-full h-full flex flex-col items-center justify-center"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={handleDrop}
-                >
-                  {!file ? (
-                    <>
-                      <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 border border-white/10">
-                        <UploadCloud size={32} className="text-indigo-400 drop-shadow-[0_0_10px_rgba(129,140,248,0.5)]" />
-                      </div>
-                      <p className="text-lg font-medium text-white/80">Drop your file here</p>
-                      <p className="text-sm text-white/30 mt-2 mb-8">Up to 100MB • End-to-End Encrypted</p>
-                      
-                      <label className="btn-primary px-8 py-3 rounded-xl font-medium text-sm cursor-pointer flex items-center gap-2">
-                        Browse Files <ArrowRight size={14} />
-                        <input type="file" className="hidden" onChange={(e) => e.target.files && setFile(e.target.files[0])} />
-                      </label>
-                    </>
-                  ) : (
-                    <div className="w-full text-center">
-                      <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/20 flex items-center justify-center mb-4 border border-indigo-500/30 text-indigo-300">
-                        <Zap size={28} fill="currentColor" />
-                      </div>
-                      <h3 className="text-xl font-semibold mb-1 truncate px-4">{file.name}</h3>
-                      <p className="text-sm text-white/40 mb-8">{(file.size / 1024 / 1024).toFixed(2)} MB ready to lock</p>
-                      
-                      <button onClick={startProcess} className="w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2">
-                        <Lock size={16} /> Encrypt & Upload
-                      </button>
-                      <button onClick={() => setFile(null)} className="mt-4 text-xs text-white/30 hover:text-white transition-colors">
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              )}
+          {/* Window chrome like GNOME/Konsole */}
+          <div className="window-chrome">
+            <div className="flex items-center gap-2">
+              <div className="window-dots">
+                <span className="window-dot red" />
+                <span className="window-dot yellow" />
+                <span className="window-dot green" />
+              </div>
+              <span className="text-xs text-slate-400 font-mono">
+                /usr/bin/void.sh · bunker-mode
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-500 font-mono">
+              {status === 'IDLE' && 'ready'}
+              {status === 'ENCRYPTING' && 'encrypting…'}
+              {status === 'DONE' && 'done'}
+            </span>
+          </div>
 
-              {status === 'ENCRYPTING' && (
-                <motion.div 
-                  key="encrypting"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex flex-col items-center"
-                >
-                  <div className="relative w-24 h-24 mb-6">
-                    <svg className="animate-spin duration-[3s] w-full h-full text-indigo-500/20" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Lock size={24} className="text-indigo-400" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-medium animate-pulse">Encrypting...</h3>
-                  <p className="text-sm text-white/30 mt-2">Deriving keys with Argon2id</p>
-                </motion.div>
-              )}
+          {/* Fake prompt line */}
+          <div className="mb-5 text-xs md:text-sm font-mono text-slate-300">
+            <p>
+              <span className="text-emerald-400">void@bunker</span>
+              <span className="text-slate-500">:~$</span> initialize secure transfer
+              <span className="cursor-blink" />
+            </p>
+          </div>
 
-              {status === 'DONE' && (
-                <motion.div 
-                  key="done"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="w-full px-4 text-center"
-                >
-                  <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-6 text-green-400 border border-green-500/30 shadow-[0_0_30px_rgba(74,222,128,0.2)]">
-                    <CheckCircle size={32} />
-                  </div>
-                  <h3 className="text-2xl font-bold mb-2">Secure Link Ready</h3>
-                  <p className="text-white/40 text-sm mb-6">This link contains the decryption key. Don't lose it.</p>
-                  
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-1 pl-4 flex items-center gap-2 mb-6 group-focus-within:border-indigo-500/50 transition-colors">
-                    <span className="text-white/40 text-sm truncate flex-1 font-mono text-left">void.sh/d/x91...#key_812</span>
-                    <button 
-                      onClick={copyLink}
-                      className="bg-white/10 hover:bg-white/20 p-2.5 rounded-lg text-white transition-all active:scale-95"
-                    >
-                      {copied ? <CheckCircle size={18} className="text-green-400" /> : <Copy size={18} />}
-                    </button>
-                  </div>
+          {/* Technical status tags */}
+          <div className="flex flex-wrap gap-4 mb-6 text-[11px] md:text-xs font-mono text-slate-400">
+            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900/60 border border-slate-800">
+              <Shield size={13} className="text-emerald-400" /> crypto-suite: AES-256-GCM
+            </span>
+            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900/60 border border-slate-800">
+              <Eye size={13} className="text-sky-400" /> scope: browser-only (no upload)
+            </span>
+            <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900/60 border border-slate-800">
+              <Skull size={13} className="text-rose-400" /> policy: zero recovery · zero trust
+            </span>
+          </div>
 
-                  <button 
-                    onClick={() => { setStatus('IDLE'); setFile(null); }}
-                    className="text-sm text-white/30 hover:text-white transition-colors"
+          {/* Main interaction area */}
+          {status === 'IDLE' && (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={[
+                'border-2 rounded-lg transition-all duration-200 h-64',
+                'flex flex-col items-center justify-center cursor-pointer group relative',
+                isDragOver
+                  ? 'border-emerald-400 bg-emerald-500/5'
+                  : 'border-dashed border-slate-700 hover:border-emerald-500 hover:bg-slate-800/40'
+              ].join(' ')}
+            >
+              {!file ? (
+                <>
+                  <Upload
+                    size={42}
+                    className="mb-4 text-slate-500 group-hover:text-emerald-400 transition-colors"
+                  />
+                  <p className="text-base md:text-lg font-semibold text-slate-100">
+                    Drag a file here to secure it
+                  </p>
+                  <p className="text-[11px] md:text-xs text-slate-400 mt-1">
+                    or click to choose it from your filesystem
+                  </p>
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileInput}
+                    id="fileInput"
+                  />
+                  <label
+                    htmlFor="fileInput"
+                    className="absolute inset-0 cursor-pointer"
+                  ></label>
+                </>
+              ) : (
+                <div className="text-center px-4">
+                  <FileCheck size={40} className="mx-auto mb-3 text-emerald-400" />
+                  <p className="text-lg font-semibold text-slate-100 truncate max-w-xs mx-auto">
+                    {file.name}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {(file.size / 1024).toFixed(2)} KB detected · ready for encryption
+                  </p>
+                  <button
+                    onClick={startEncryption}
+                    className="mt-5 inline-flex items-center justify-center bg-emerald-500 text-slate-900 font-semibold px-6 py-2 rounded-md hover:bg-emerald-400 transition-colors text-xs md:text-sm tracking-wide"
                   >
-                    Send another file
+                    Start secure encryption
                   </button>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
-            
-          </div>
-        </motion.div>
+            </div>
+          )}
 
-        <div className="mt-12 flex gap-8 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
-          <div className="flex items-center gap-2 text-xs">
-            <ShieldCheck size={14} /> AES-256-GCM
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <Zap size={14} /> WebAssembly
-          </div>
+          {status === 'ENCRYPTING' && (
+            <div className="h-64 flex flex-col items-center justify-center text-center space-y-4">
+              <Lock size={42} className="text-emerald-400 animate-pulse" />
+              <p className="text-lg font-semibold text-slate-100">
+                Encrypting…
+              </p>
+              <div className="w-full max-w-md h-2 bg-slate-900 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 animate-pulse" style={{ width: '70%' }} />
+              </div>
+              <div className="text-[11px] md:text-xs font-mono text-slate-400 text-left max-w-md mx-auto">
+                <p>&gt; deriving_keys  · OK</p>
+                <p>&gt; sealing_payload · OK</p>
+                <p>&gt; scrubbing_metadata · ACTIVE</p>
+              </div>
+            </div>
+          )}
+
+          {status === 'DONE' && (
+            <div className="h-64 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-full max-w-xl border border-slate-700 rounded-md bg-slate-900/70 p-3 text-left">
+                <p className="text-[11px] text-slate-500 mb-1 font-mono">
+                  generated link (example · will be real later):
+                </p>
+                <code className="block text-xs md:text-sm bg-slate-950/80 px-3 py-2 rounded text-emerald-300 break-all">
+                  https://void.sh/d/7x91_safe#key_812739
+                </code>
+              </div>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <button
+                  onClick={() => setStatus('IDLE')} // TODO: later you will add real clipboard copy
+                  className="inline-flex items-center justify-center bg-emerald-500 text-slate-900 font-semibold px-5 py-2 rounded-md hover:bg-emerald-400 transition-colors text-xs md:text-sm"
+                >
+                  Copy link
+                </button>
+                <button
+                  onClick={resetAll}
+                  className="inline-flex items-center justify-center border border-slate-600 text-slate-200 px-5 py-2 rounded-md hover:border-emerald-400 hover:text-emerald-200 transition-colors text-xs md:text-sm"
+                >
+                  New operation
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* Security notice footer */}
+        <div className="mt-6 text-center max-w-xl text-[11px] md:text-xs text-slate-500 font-mono">
+          <p className="mb-1">
+            Notice: encryption will happen locally in your browser. No keys or plaintext
+            files are sent to remote servers.
+          </p>
+          <p>
+            If you lose the key or the link, the data is unrecoverable for anyone. This is
+            by design · zero recovery, zero log.
+          </p>
+        </div>
       </main>
+
+      {/* Small “terminal status” details */}
+      <div className="fixed bottom-4 left-4 text-[10px] text-slate-600 font-mono hidden md:block">
+        TTY1 · MEM 64MB OK · CPU 7% · KERNEL 6.6
+      </div>
+      <div className="fixed bottom-4 right-4 text-[10px] text-slate-600 font-mono hidden md:block">
+        DISPLAY :0 · WM: tiling · THEME: dark
+      </div>
     </div>
   );
 }
