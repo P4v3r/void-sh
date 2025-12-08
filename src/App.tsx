@@ -8,8 +8,8 @@ type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-console.log('VITE_SUPABASE_URL =', supabaseUrl);
-console.log('VITE_SUPABASE_ANON_KEY present =', !!supabaseAnonKey);
+const supabaseUrlPresent = !!supabaseUrl;
+const supabaseAnonPresent = !!supabaseAnonKey;
 
 let supabase: SupabaseClient | null = null;
 
@@ -147,6 +147,13 @@ function App() {
                 <p className="text-[13px] text-emerald-300/80">
                   No accounts, no tracking, no server-side decryption or key recovery.
                 </p>
+                
+                {/* DEBUG ENV – togli dopo i test */}
+                <div className="mt-2 text-[11px] text-red-400/80">
+                  <p>DEBUG SUPABASE_URL: {supabaseUrlPresent ? 'OK' : 'MANCANTE'}</p>
+                  <p>DEBUG ANON_KEY: {supabaseAnonPresent ? 'OK' : 'MANCANTE'}</p>
+                </div>
+
               </div>
             </div>
             <div className="text-right text-[12px] text-emerald-500 space-y-0.5">
