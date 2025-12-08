@@ -1,179 +1,188 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Upload, Lock, CheckCircle2, FileText, Link2 } from 'lucide-react';
+import { ShieldCheck, UploadCloud, Lock, ArrowRight, Zap, Copy, CheckCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [status, setStatus] = useState<'IDLE' | 'ENCRYPTING' | 'DONE'>('IDLE');
+  const [copied, setCopied] = useState(false);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-  const handleDragLeave = () => setIsDragOver(false);
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0]);
     }
   };
 
-  const startEncryption = () => {
+  const startProcess = () => {
     if (!file) return;
     setStatus('ENCRYPTING');
-    setTimeout(() => {
-      setStatus('DONE');
-    }, 1600);
+    setTimeout(() => setStatus('DONE'), 2500); // Simulazione più lunga per l'effetto
   };
 
-  const resetAll = () => {
-    setFile(null);
-    setStatus('IDLE');
+  const copyLink = () => {
+    navigator.clipboard.writeText("https://void.sh/d/x91_safe#key_812");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-6 md:py-10 flex items-center justify-center">
-      <div className="max-w-4xl w-full">
-        {/* Header */}
-        <header className="mb-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 border border-emerald-400/40 flex items-center justify-center">
-              <ShieldCheck className="text-emerald-400" size={22} />
-            </div>
-            <div>
-              <div className="logo-mark">VOID.SH</div>
-              <div className="logo-title">File bunker per maniaci della privacy</div>
-              <p className="logo-subtitle">
-                Cifra, nascondi e condividi file in modo sicuro. Tutto avviene sul tuo dispositivo.
-              </p>
-            </div>
-          </div>
-          <div className="hidden md:flex flex-col items-end text-xs text-slate-400">
-            <span>Client-side only • Zero log</span>
-            <span className="text-emerald-400">Connessione sicura attiva</span>
-          </div>
-        </header>
+    <div className="min-h-screen flex flex-col relative text-white antialiased selection:bg-indigo-500/30">
+      <div className="aurora-bg" />
 
-        <div className="glass-panel neon-frame p-5 md:p-7">
-
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mb-5">
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/40">
-              <Lock size={14} />
-              AES-256 • Client-side
-            </span>
-            <span>Chiavi non salvate • Nessun tracciamento</span>
+      <nav className="w-full max-w-6xl mx-auto p-6 flex justify-between items-center z-10">
+        <div className="flex items-center gap-2 font-semibold tracking-tight text-xl">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <Lock size={16} className="text-white" />
           </div>
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
+            Void.sh
+          </span>
+        </div>
+        <div className="hidden md:flex gap-6 text-sm text-white/50 font-medium">
+          <span className="hover:text-white transition-colors cursor-pointer">Manifesto</span>
+          <span className="hover:text-white transition-colors cursor-pointer">Security</span>
+          <span className="hover:text-white transition-colors cursor-pointer">GitHub</span>
+        </div>
+      </nav>
 
-          {status === 'IDLE' && (
-            <div className="grid gap-6 md:grid-cols-[minmax(0,2fr),minmax(0,1fr)] items-start">
-              {/* Dropzone */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`dropzone relative flex flex-col items-center justify-center px-4 py-10 cursor-pointer ${
-                  isDragOver ? 'dropzone-hover' : ''
-                }`}
-              >
-                {!file ? (
-                  <>
-                    <Upload size={40} className="mb-3 text-slate-300" />
-                    <p className="text-base font-semibold">Trascina qui un file da proteggere</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      oppure clicca per selezionarlo dal dispositivo
-                    </p>
-                    <input
-                      type="file"
-                      className="hidden"
-                      id="fileInput"
-                      onChange={(e) => e.target.files && setFile(e.target.files[0])}
-                    />
-                    <label htmlFor="fileInput" className="absolute inset-0" />
-                  </>
-                ) : (
-                  <div className="text-center px-4">
-                    <FileText size={36} className="mx-auto mb-3 text-emerald-300" />
-                    <p className="font-semibold break-all">{file.name}</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {(file.size / 1024).toFixed(1)} KB selezionati
-                    </p>
-                    <button
-                      onClick={startEncryption}
-                      className="btn-primary mt-5"
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 z-10">
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-10 max-w-2xl"
+        >
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/40">
+            Invisible Storage.
+          </h1>
+          <p className="text-lg text-white/40 font-light">
+            Client-side encryption. Zero knowledge. <br className="hidden md:block"/>
+            The file never leaves your device unencrypted.
+          </p>
+        </motion.div>
+
+        <motion.div 
+          layout
+          className="w-full max-w-md glass-panel rounded-3xl p-1 overflow-hidden relative group"
+        >
+
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 rounded-3xl opacity-0 group-hover:opacity-100 transition duration-500 blur-lg" />
+          
+          <div className="relative bg-[#0a0a0a]/80 rounded-[22px] p-8 h-[400px] flex flex-col items-center justify-center">
+            
+            <AnimatePresence mode="wait">
+              {status === 'IDLE' && (
+                <motion.div 
+                  key="idle"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="w-full h-full flex flex-col items-center justify-center"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                >
+                  {!file ? (
+                    <>
+                      <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 border border-white/10">
+                        <UploadCloud size={32} className="text-indigo-400 drop-shadow-[0_0_10px_rgba(129,140,248,0.5)]" />
+                      </div>
+                      <p className="text-lg font-medium text-white/80">Drop your file here</p>
+                      <p className="text-sm text-white/30 mt-2 mb-8">Up to 100MB • End-to-End Encrypted</p>
+                      
+                      <label className="btn-primary px-8 py-3 rounded-xl font-medium text-sm cursor-pointer flex items-center gap-2">
+                        Browse Files <ArrowRight size={14} />
+                        <input type="file" className="hidden" onChange={(e) => e.target.files && setFile(e.target.files[0])} />
+                      </label>
+                    </>
+                  ) : (
+                    <div className="w-full text-center">
+                      <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/20 flex items-center justify-center mb-4 border border-indigo-500/30 text-indigo-300">
+                        <Zap size={28} fill="currentColor" />
+                      </div>
+                      <h3 className="text-xl font-semibold mb-1 truncate px-4">{file.name}</h3>
+                      <p className="text-sm text-white/40 mb-8">{(file.size / 1024 / 1024).toFixed(2)} MB ready to lock</p>
+                      
+                      <button onClick={startProcess} className="w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                        <Lock size={16} /> Encrypt & Upload
+                      </button>
+                      <button onClick={() => setFile(null)} className="mt-4 text-xs text-white/30 hover:text-white transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {status === 'ENCRYPTING' && (
+                <motion.div 
+                  key="encrypting"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-col items-center"
+                >
+                  <div className="relative w-24 h-24 mb-6">
+                    <svg className="animate-spin duration-[3s] w-full h-full text-indigo-500/20" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Lock size={24} className="text-indigo-400" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-medium animate-pulse">Encrypting...</h3>
+                  <p className="text-sm text-white/30 mt-2">Deriving keys with Argon2id</p>
+                </motion.div>
+              )}
+
+              {status === 'DONE' && (
+                <motion.div 
+                  key="done"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-full px-4 text-center"
+                >
+                  <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-6 text-green-400 border border-green-500/30 shadow-[0_0_30px_rgba(74,222,128,0.2)]">
+                    <CheckCircle size={32} />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">Secure Link Ready</h3>
+                  <p className="text-white/40 text-sm mb-6">This link contains the decryption key. Don't lose it.</p>
+                  
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-1 pl-4 flex items-center gap-2 mb-6 group-focus-within:border-indigo-500/50 transition-colors">
+                    <span className="text-white/40 text-sm truncate flex-1 font-mono text-left">void.sh/d/x91...#key_812</span>
+                    <button 
+                      onClick={copyLink}
+                      className="bg-white/10 hover:bg-white/20 p-2.5 rounded-lg text-white transition-all active:scale-95"
                     >
-                      Proteggi il file
+                      {copied ? <CheckCircle size={18} className="text-green-400" /> : <Copy size={18} />}
                     </button>
                   </div>
-                )}
-              </div>
 
-              <aside className="space-y-3 text-sm text-slate-300">
-                <p className="font-medium">Come funziona</p>
-                <ul className="space-y-2 text-xs text-slate-400">
-                  <li>• Il file viene cifrato direttamente nel tuo browser.</li>
-                  <li>• La chiave di cifratura non lascia mai il tuo dispositivo.</li>
-                  <li>• Puoi condividere un link con chiave incorporata (stile “secure link”).</li>
-                  <li>• In futuro qui compariranno modalità “steganografia” ed “eredità digitale”.</li>
-                </ul>
-                <div className="mt-3 text-[11px] text-slate-500 border-t border-slate-700/60 pt-3">
-                  Nota: se perdi la chiave o il link generato, nessuno (nemmeno noi) potrà
-                  recuperare il contenuto.
-                </div>
-              </aside>
-            </div>
-          )}
+                  <button 
+                    onClick={() => { setStatus('IDLE'); setFile(null); }}
+                    className="text-sm text-white/30 hover:text-white transition-colors"
+                  >
+                    Send another file
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+          </div>
+        </motion.div>
 
-          {status === 'ENCRYPTING' && (
-            <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
-              <Lock size={40} className="text-emerald-300 animate-pulse" />
-              <p className="text-base font-semibold">Cifratura in corso…</p>
-              <p className="text-xs text-slate-400">
-                Stiamo preparando un pacchetto sicuro che solo chi possiede la chiave potrà aprire.
-              </p>
-              <div className="w-full max-w-md mt-4">
-                <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
-                  <div className="h-full w-2/3 bg-gradient-to-r from-emerald-400 to-sky-400 animate-pulse" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {status === 'DONE' && (
-            <div className="flex flex-col items-center justify-center py-10 gap-5 text-center">
-              <CheckCircle2 size={40} className="text-emerald-400" />
-              <div>
-                <p className="text-base font-semibold mb-1">File protetto con successo</p>
-                <p className="text-xs text-slate-400">
-                  Condividi questo link solo con chi deve avere accesso al contenuto.
-                </p>
-              </div>
-              <div className="w-full max-w-xl text-left text-xs">
-                <p className="mb-1 text-slate-400 flex items-center gap-1">
-                  <Link2 size={14} /> Link sicuro (esempio)
-                </p>
-                <div className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 font-mono text-[11px] break-all text-slate-200">
-                  https://void.sh/d/7x91_safe#key_812739
-                </div>
-              </div>
-              <div className="flex gap-3 mt-2">
-                <button className="btn-primary">
-                  Copia link
-                </button>
-                <button className="btn-ghost" onClick={resetAll}>
-                  Nuovo file
-                </button>
-              </div>
-            </div>
-          )}
+        <div className="mt-12 flex gap-8 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
+          <div className="flex items-center gap-2 text-xs">
+            <ShieldCheck size={14} /> AES-256-GCM
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Zap size={14} /> WebAssembly
+          </div>
         </div>
 
-        <p className="mt-4 text-[11px] text-slate-500 text-center max-w-2xl mx-auto">
-          Void.sh nasce con un approccio “privacy-first”: nessun tracciamento, nessun account obbligatorio,
-          nessuna analisi dei contenuti. L’obiettivo è diventare il posto sicuro dove i tuoi file
-          sensibili non lasciano mai davvero il tuo controllo.
-        </p>
-      </div>
+      </main>
     </div>
   );
 }
