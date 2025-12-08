@@ -155,8 +155,16 @@ function App() {
         return;
       }
 
-      const safeName = sanitizeFilename(file.name);
-      const objectPath = `files/${Date.now()}-${safeName}`;
+      const getExtension = (name: string) => {
+        const parts = name.split('.');
+        if (parts.length < 2) return 'bin';
+        return parts.pop()!.toLowerCase();
+      };
+
+      const ext = getExtension(file.name);
+      const randomId = crypto.randomUUID();
+      const objectPath = `files/${randomId}.${ext}`;
+
 
       const { error: uploadError } = await supabase.storage
   .from('vault-files')
@@ -183,7 +191,6 @@ if (uploadError) {
   setStatus('READY');
   return;
 }
-
 
       const origin = window.location.origin;
       const link = `${origin}/d/${encodeURIComponent(objectPath)}#${encodeURIComponent(
