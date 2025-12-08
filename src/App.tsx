@@ -141,18 +141,31 @@ function App() {
       const objectPath = `files/${Date.now()}-${file.name}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('vault-files')
-        .upload(objectPath, encryptedBlob, {
-          contentType: 'application/octet-stream',
-          upsert: false,
-        });
+  .from('vault-files')
+  .upload(objectPath, encryptedBlob, {
+    contentType: 'application/octet-stream',
+    upsert: false,
+  });
 
-      if (uploadError) {
-        console.error(uploadError);
-        setEncryptError('Upload failed. Encrypted file was not stored on the server.');
-        setStatus('READY');
-        return;
-      }
+if (uploadError) {
+  console.error('Supabase upload error', uploadError);
+
+  // DEBUG PROVVISORIO: mostra tutto a schermo sul telefono
+  alert(
+    'Supabase upload error:\n\n' +
+    'name: ' + (uploadError.name || '') + '\n' +
+    'message: ' + (uploadError.message || '') + '\n' +
+    'status: ' + ((uploadError as any).status || '') + '\n' +
+    'statusCode: ' + ((uploadError as any).statusCode || '')
+  );
+
+  setEncryptError(
+    `Upload failed: ${uploadError.message || 'unknown error'}.`
+  );
+  setStatus('READY');
+  return;
+}
+
 
       const origin = window.location.origin;
       const link = `${origin}/d/${encodeURIComponent(objectPath)}#${encodeURIComponent(
@@ -280,7 +293,6 @@ function App() {
   return (
     <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center">
       <div className="w-full max-w-5xl px-4 py-4">
-        {/* HEADER */}
         <header>
           <div className="flex items-baseline justify-between">
             <div className="flex flex-col gap-2">
