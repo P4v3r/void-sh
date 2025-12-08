@@ -1,31 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
 import { decryptFile } from './crypto';
 import { Lock, Download } from 'lucide-react';
 
-import { createClient} from '@supabase/supabase-js';
-
-//const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-//const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
+// stessi valori di App.tsx
 const supabaseUrl = 'https://rsnjdhkrgtuepivllvux.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzbmpkaGtyZ3R1ZXBpdmxsdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxODExNTEsImV4cCI6MjA4MDc1NzE1MX0.WKxJB0TMJw3_zBvQsI3vpQxWbrT824OzdHtefgnNvPo';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-//let supabase: SupabaseClient | null = null;
-
-/*if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  console.error('Supabase environment variables are missing in this environment');
-}*/
-
 function DownloadPage() {
-  const { objectPath } = useParams(); // viene da /d/:objectPath
+  const { objectPath } = useParams();
   const [status, setStatus] = useState<'LOADING' | 'READY' | 'ERROR'>('LOADING');
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadFileName, setDownloadFileName] = useState<string>('file');
 
   useEffect(() => {
     const run = async () => {
@@ -36,6 +26,18 @@ function DownloadPage() {
           return;
         }
 
+        // calcola il nome originale dal path: files/<timestamp>-<nome>
+        let originalName = 'file';
+        const parts = objectPath.split('/');
+        const last = parts[parts.length - 1]; // es. "1700000000000-report.pdf"
+        const dashIndex = last.indexOf('-');
+        if (dashIndex !== -1) {
+          originalName = last.slice(dashIndex + 1);
+        } else {
+          originalName = last;
+        }
+        setDownloadFileName(originalName);
+
         // 1) recupera la chiave dall'hash #...
         const hash = window.location.hash; // es. "#KEY:IV"
         const keyString = decodeURIComponent(hash.replace(/^#/, ''));
@@ -45,17 +47,10 @@ function DownloadPage() {
           return;
         }
 
-        if (!supabase) {
-          setError('Server configuration error: storage is not available right now.');
-          setStatus('ERROR');
-          return;
-        }
-
         // 2) scarica il blob cifrato da Supabase
         const { data, error: downloadError } = await supabase.storage
           .from('vault-files')
           .download(objectPath);
-
 
         if (downloadError || !data) {
           console.error(downloadError);
@@ -84,7 +79,7 @@ function DownloadPage() {
   return (
     <div className="min-h-screen text-[15px] text-emerald-100 bg-[#050b10]">
       <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col min-h-screen">
-        <header>
+          <header>
           <div className="flex items-baseline justify-between">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
@@ -102,7 +97,7 @@ function DownloadPage() {
               </div>
             </div>
             <div className="text-right text-[12px] text-emerald-500 space-y-0.5">
-              <p>CLIENT-SIDE ONLY</p>                 
+              <p>CLIENT-SIDE ONLY</p>
               <p>NO ACCOUNTS · NO LOGS</p>
             </div>
           </div>
@@ -136,7 +131,7 @@ function DownloadPage() {
               </div>
               <a
                 href={downloadUrl}
-                download="file"
+                download={downloadFileName}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-500 text-black text-[14px] font-semibold hover:bg-emerald-400 transition-colors"
               >
                 <Download size={16} />

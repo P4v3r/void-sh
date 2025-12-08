@@ -1,87 +1,124 @@
 import React, { useState } from 'react';
 import { Lock, Upload, CheckCircle2 } from 'lucide-react';
-import { encryptFile } from './crypto';
-//import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { createClient} from '@supabase/supabase-js';
+import { encryptFile, decryptFile } from './crypto';
+import { createClient } from '@supabase/supabase-js';
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
+type Mode = 'LOCAL_ONLY' | 'UPLOAD';
 
-//const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-//const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Limite SOLO per modalità con upload (100 MB qui, puoi modificarlo)
+const MAX_UPLOAD_MB = 100;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
+// Limite di sicurezza assoluto per qualsiasi operazione in browser (es. 2 GB)
+const HARD_MAX_MB = 2048;
+const HARD_MAX_BYTES = HARD_MAX_MB * 1024 * 1024;
+
+// client Supabase hardcoded (anon key è pubblica)
 const supabaseUrl = 'https://rsnjdhkrgtuepivllvux.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzbmpkaGtyZ3R1ZXBpdmxsdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxODExNTEsImV4cCI6MjA4MDc1NzE1MX0.WKxJB0TMJw3_zBvQsI3vpQxWbrT824OzdHtefgnNvPo';
-
-const supabaseUrlPresent = !!supabaseUrl;
-const supabaseAnonPresent = !!supabaseAnonKey;
-
-//let supabase: SupabaseClient | null = null;
+const supabaseAnonKey =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzbmpkaGtyZ3R1ZXBpdmxsdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxODExNTEsImV4cCI6MjA4MDc1NzE1MX0.WKxJB0TMJw3_zBvQsI3vpQxWbrT824OzdHtefgnNvPo';
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-/*if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  console.error('Supabase environment variables are missing in this environment');
-}*/
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>('IDLE');
   const [copied, setCopied] = useState(false);
-  const [isHover, setIsHover] = useState(false);
+  const [isHoverEncrypt, setIsHoverEncrypt] = useState(false);
 
-  //const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [keyString, setKeyString] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [encryptError, setEncryptError] = useState<string | null>(null);
 
-  const handleDrop = (e: React.DragEvent) => {
+  // stati per DECRYPT locale
+  const [encryptedFile, setEncryptedFile] = useState<File | null>(null);
+  const [decryptKey, setDecryptKey] = useState<string>('');
+  const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
+  const [decryptedFileName, setDecryptedFileName] = useState<string>('decrypted');
+  const [decryptError, setDecryptError] = useState<string | null>(null);
+  const [isHoverDecrypt, setIsHoverDecrypt] = useState(false);
+
+  // ---- ENCRYPT HANDLERS ----
+
+  const handleDropEncrypt = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsHover(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-      setStatus('READY');
-      //setDownloadUrl(null);
-      setKeyString(null);
-      setShareLink(null);
-      setError(null);
+    setIsHoverEncrypt(false);
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+
+    if (f.size > HARD_MAX_BYTES) {
+      setEncryptError(
+        `This file is larger than ${HARD_MAX_MB} MB. Very large files can freeze the browser. Please use something smaller (recommended max 1–2 GB).`,
+      );
+      return;
     }
+
+    setFile(f);
+    setStatus('READY');
+    setDownloadUrl(null);
+    setKeyString(null);
+    setShareLink(null);
+    setEncryptError(null);
   };
 
-  const handleBrowse = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setStatus('READY');
-      //setDownloadUrl(null);
-      setKeyString(null);
-      setShareLink(null);
-      setError(null);
+  const handleBrowseEncrypt = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+
+    if (f.size > HARD_MAX_BYTES) {
+      setEncryptError(
+        `This file is larger than ${HARD_MAX_MB} MB. Very large files can freeze the browser. Please use something smaller (recommended max 1–2 GB).`,
+      );
+      return;
     }
+
+    setFile(f);
+    setStatus('READY');
+    setDownloadUrl(null);
+    setKeyString(null);
+    setShareLink(null);
+    setEncryptError(null);
   };
 
-  const startEncrypt = async () => {
+  const startEncrypt = async (mode: Mode) => {
     if (!file) return;
 
-    if (!supabase) {
-      setError('Server configuration error: storage is not available right now.');
+    // guardia extra (nel caso lo stato sia stato impostato altrove)
+    if (file.size > HARD_MAX_BYTES) {
+      setEncryptError(
+        `This file is larger than ${HARD_MAX_MB} MB. Very large files can freeze the browser. Please use something smaller (recommended max 1–2 GB).`,
+      );
+      setStatus('READY');
+      return;
+    }
+
+    if (mode === 'UPLOAD' && file.size > MAX_UPLOAD_BYTES) {
+      setEncryptError(
+        `Online sharing supports files up to ${MAX_UPLOAD_MB} MB. Use "Encrypt only (no upload)" for larger files.`,
+      );
+      setStatus('READY');
       return;
     }
 
     try {
       setStatus('ENCRYPTING');
-      setError(null);
+      setEncryptError(null);
       setCopied(false);
 
-      // 1) CIFRA NEL BROWSER
       const { encryptedBlob, keyString } = await encryptFile(file);
-
-      // URL locale (non obbligatorio, ma utile)
-      //const localUrl = URL.createObjectURL(encryptedBlob);
-      //setDownloadUrl(localUrl);
       setKeyString(keyString);
 
-      // 2) UPLOAD SU SUPABASE STORAGE (bucket: vault-files)
+      const localUrl = URL.createObjectURL(encryptedBlob);
+      setDownloadUrl(localUrl);
+
+      if (mode === 'LOCAL_ONLY') {
+        setShareLink(null);
+        setStatus('DONE');
+        return;
+      }
+
       const objectPath = `files/${Date.now()}-${file.name}`;
 
       const { error: uploadError } = await supabase.storage
@@ -93,12 +130,11 @@ function App() {
 
       if (uploadError) {
         console.error(uploadError);
-        setError('Upload failed. Encrypted file was not stored on the server.');
+        setEncryptError('Upload failed. Encrypted file was not stored on the server.');
         setStatus('READY');
         return;
       }
 
-      // 3) CREA LINK /d/...#chiave
       const origin = window.location.origin;
       const link = `${origin}/d/${encodeURIComponent(objectPath)}#${encodeURIComponent(
         keyString,
@@ -108,7 +144,7 @@ function App() {
       setStatus('DONE');
     } catch (err) {
       console.error(err);
-      setError('Encryption failed. Please try with a different file.');
+      setEncryptError('Encryption failed. Please try with a different file.');
       setStatus('READY');
     }
   };
@@ -120,20 +156,111 @@ function App() {
     setTimeout(() => setCopied(false), 1200);
   };
 
+  // ---- RESET COMPLETO ----
+
   const reset = () => {
     setFile(null);
     setStatus('IDLE');
     setCopied(false);
-    setIsHover(false);
-    //setDownloadUrl(null);
+    setIsHoverEncrypt(false);
+    setDownloadUrl(null);
     setKeyString(null);
     setShareLink(null);
-    setError(null);
+    setEncryptError(null);
+
+    resetDecrypt();
+  };
+
+  // ---- RESET SOLO DECRYPT ----
+
+  const resetDecrypt = () => {
+    setEncryptedFile(null);
+    setDecryptKey('');
+    setDecryptedUrl(null);
+    setDecryptedFileName('decrypted');
+    setDecryptError(null);
+    setIsHoverDecrypt(false);
+  };
+
+  // ---- DECRYPT HANDLERS ----
+
+  const handleDropDecrypt = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsHoverDecrypt(false);
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+
+    if (f.size > HARD_MAX_BYTES) {
+      setDecryptError(
+        `This encrypted file is larger than ${HARD_MAX_MB} MB. Decrypting very large files in the browser can exhaust memory and freeze the page. Use something smaller (recommended max 1–2 GB).`,
+      );
+      return;
+    }
+
+    setEncryptedFile(f);
+    setDecryptedUrl(null);
+    setDecryptError(null);
+
+    let baseName = f.name;
+    if (baseName.toLowerCase().endsWith('.enc')) {
+      baseName = baseName.slice(0, -4); // togli .enc
+    }
+    baseName = baseName.replace(/\s\(\d+\)$/, ''); // togli " (1)" finale
+    setDecryptedFileName(baseName || 'decrypted');
+  };
+
+  const handleBrowseDecrypt = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] || null;
+    if (!f) {
+      resetDecrypt();
+      return;
+    }
+
+    if (f.size > HARD_MAX_BYTES) {
+      setDecryptError(
+        `This encrypted file is larger than ${HARD_MAX_MB} MB. Decrypting very large files in the browser can exhaust memory and freeze the page. Use something smaller (recommended max 1–2 GB).`,
+      );
+      return;
+    }
+
+    setEncryptedFile(f);
+    setDecryptedUrl(null);
+    setDecryptError(null);
+
+    let baseName = f.name;
+    if (baseName.toLowerCase().endsWith('.enc')) {
+      baseName = baseName.slice(0, -4);
+    }
+    baseName = baseName.replace(/\s\(\d+\)$/, '');
+    setDecryptedFileName(baseName || 'decrypted');
+  };
+
+  const handleDecrypt = async () => {
+    if (!encryptedFile || !decryptKey) return;
+
+    if (encryptedFile.size > HARD_MAX_BYTES) {
+      setDecryptError(
+        `This encrypted file is larger than ${HARD_MAX_MB} MB. Decrypting very large files in the browser can exhaust memory and freeze the page. Use something smaller (recommended max 1–2 GB).`,
+      );
+      return;
+    }
+
+    try {
+      setDecryptError(null);
+      setDecryptedUrl(null);
+
+      const decryptedBlob = await decryptFile(encryptedFile, decryptKey);
+      const url = URL.createObjectURL(decryptedBlob);
+      setDecryptedUrl(url);
+    } catch (e) {
+      console.error(e);
+      setDecryptError('Decryption failed. Check the key and the encrypted file.');
+    }
   };
 
   return (
-    <div className="min-h-screen text-[15px] text-emerald-100 bg-[#050b10]">
-      <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col min-h-screen">
+    <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center">
+      <div className="w-full max-w-5xl px-4 py-4">
         {/* HEADER */}
         <header>
           <div className="flex items-baseline justify-between">
@@ -153,13 +280,6 @@ function App() {
                 <p className="text-[13px] text-emerald-300/80">
                   No accounts, no tracking, no server-side decryption or key recovery.
                 </p>
-
-                {/* DEBUG ENV – togli dopo i test */}
-                <div className="mt-2 text-[11px] text-red-400/80">
-                  <p>DEBUG SUPABASE_URL: {supabaseUrlPresent ? 'OK' : 'MANCANTE'}</p>
-                  <p>DEBUG ANON_KEY: {supabaseAnonPresent ? 'OK' : 'MANCANTE'}</p>
-                </div>
-
               </div>
             </div>
             <div className="text-right text-[12px] text-emerald-500 space-y-0.5">
@@ -171,12 +291,12 @@ function App() {
         </header>
 
         {/* CONTENUTO PRINCIPALE */}
-        <main className="mt-5 mb-10 flex justify-start">
-          <div className="w-full max-w-xl mx-auto">
-            {/* PANNELLO FILE */}
-            <div className="panel rounded-xl p-5">
+        <main className="mt-5 mb-2 flex flex-col lg:flex-row gap-6">
+          {/* PANNELLO ENCRYPT */}
+          <div className="w-full lg:w-1/2">
+            <div className="panel rounded-xl p-5 h-full min-h-[420px]">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[13px] text-emerald-300 font-mono">[ FILE_AREA ]</span>
+                <span className="text-[13px] text-emerald-300 font-mono">[ ENCRYPT AREA ]</span>
                 <span className="text-[12px] text-emerald-500 font-mono">
                   {status === 'IDLE' && 'STATE: IDLE'}
                   {status === 'READY' && 'STATE: READY'}
@@ -200,16 +320,16 @@ function App() {
                 <div
                   className={
                     'relative mt-4 drop-area flex flex-col items-center justify-center px-4 py-7 cursor-pointer text-center transition-colors rounded-md border ' +
-                    (isHover
+                    (isHoverEncrypt
                       ? 'drop-area-hover border-emerald-400 bg-emerald-500/5'
                       : 'border-emerald-800 bg-black/30 hover:border-emerald-400 hover:bg-emerald-500/5')
                   }
                   onDragOver={(e) => {
                     e.preventDefault();
-                    setIsHover(true);
+                    setIsHoverEncrypt(true);
                   }}
-                  onDragLeave={() => setIsHover(false)}
-                  onDrop={handleDrop}
+                  onDragLeave={() => setIsHoverEncrypt(false)}
+                  onDrop={handleDropEncrypt}
                 >
                   <Upload className="mb-3 text-emerald-300" size={28} />
                   {!file ? (
@@ -223,7 +343,7 @@ function App() {
                       <input
                         type="file"
                         className="absolute inset-0 opacity-0 cursor-pointer"
-                        onChange={handleBrowse}
+                        onChange={handleBrowseEncrypt}
                       />
                     </>
                   ) : (
@@ -249,16 +369,23 @@ function App() {
                   <p className="text-[13px] text-emerald-200/90">
                     Choose what to do with this file:
                   </p>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
                       className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 font-semibold bg-emerald-500 text-black hover:bg-emerald-400"
-                      onClick={startEncrypt}
+                      onClick={() => startEncrypt('UPLOAD')}
                     >
                       <Lock size={15} />
                       <span>Encrypt and create link</span>
                     </button>
                     <button
-                      className="btn inline-flex items-center gap-3 px-3 py-2 text-[13px] rounded-md border border-emerald-700 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/70 transition-colors"
+                      className="inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/70 transition-colors"
+                      onClick={() => startEncrypt('LOCAL_ONLY')}
+                    >
+                      <Lock size={15} />
+                      <span>Encrypt only (no upload)</span>
+                    </button>
+                    <button
+                      className="btn inline-flex items-center gap-3 px-3 py-2 text-[13px] rounded-md border border-emerald-700 bg-black/40 text-emerald-200 hover:bg-black/60 transition-colors"
                       onClick={reset}
                     >
                       Clear and choose another file
@@ -281,38 +408,52 @@ function App() {
                   <div className="flex items-center gap-2 text-emerald-300">
                     <CheckCircle2 size={18} />
                     <span className="text-[15px]">
-                      Encryption complete. Your private link is ready.
+                      Encryption complete. Your encrypted file is ready.
                     </span>
                   </div>
-                  <div className="text-[13px] text-emerald-200/90">
-                    Anyone with this link can decrypt the file. We never see your key and
-                    we do not keep an unencrypted copy of your data.
-                  </div>
 
-                  <div className="mt-2">
-                    <p className="text-[13px] text-emerald-200/90 mb-1">
-                      Copy or share this encrypted link:
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border border-emerald-700/80 px-2 py-1.5 overflow-hidden bg-black/30 rounded">
-                        <span className="text-[13px] truncate">
-                          {shareLink ?? 'Link not available'}
-                        </span>
-                      </div>
-                      <button
-                        className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 font-semibold bg-emerald-500 text-black hover:bg-emerald-400"
-                        onClick={copyLink}
-                        disabled={!shareLink}
+                  {downloadUrl && (
+                    <div className="mt-2">
+                      <p className="text-[13px] text-emerald-200/90 mb-1">
+                        Download the encrypted file (local backup):
+                      </p>
+                      <a
+                        href={downloadUrl}
+                        download={`${file?.name || 'file'}.enc`}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-black/40 border border-emerald-700 text-[13px] hover:bg-black/60"
                       >
-                        {copied ? 'Copied' : 'Copy link'}
-                      </button>
+                        Download encrypted file
+                      </a>
                     </div>
-                    {keyString && (
-                      <div className="mt-2 text-[12px] text-emerald-300/80 break-all">
-                        Key (keep this secret, without it the file is lost): {keyString}
+                  )}
+
+                  {shareLink && (
+                    <div className="mt-2">
+                      <p className="text-[13px] text-emerald-200/90 mb-1">
+                        Copy or share this encrypted link:
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 border border-emerald-700/80 px-2 py-1.5 overflow-hidden bg-black/30 rounded">
+                          <span className="text-[13px] truncate">
+                            {shareLink ?? 'Link not available'}
+                          </span>
+                        </div>
+                        <button
+                          className="btn inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 font-semibold bg-emerald-500 text-black hover:bg-emerald-400"
+                          onClick={copyLink}
+                          disabled={!shareLink}
+                        >
+                          {copied ? 'Copied' : 'Copy link'}
+                        </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {keyString && (
+                    <div className="mt-2 text-[12px] text-emerald-300/80 break-all">
+                      Key (keep this secret, without it the file is lost): {keyString}
+                    </div>
+                  )}
 
                   <div className="mt-2">
                     <p className="text-[13px] text-emerald-200/90 mb-1">
@@ -331,8 +472,14 @@ function App() {
               <div className="mt-5 hr-line" />
               <div className="mt-2">
                 {status === 'IDLE' && (
-                  <p className="console-line text-emerald-400/75 text-[13px]">
-                    &gt; waiting for file…
+                  <p className="text-[11px] text-emerald-300/70 mt-1">
+                    Online sharing limit: up to {MAX_UPLOAD_MB} MB. For larger files, use
+                    &quot;Encrypt only&quot; and store the encrypted file wherever you
+                    prefer.
+                    <br /> <br />
+                    Offline encryption and decryption depend on your CPU, RAM and browser.
+                    Very large files (above ~1–2 GB) can take a long time or freeze the
+                    page, especially on weaker machines.
                   </p>
                 )}
                 {status === 'READY' && file && (
@@ -350,29 +497,158 @@ function App() {
                     &gt; encryption done · server never sees your key
                   </p>
                 )}
-                {error && (
+                {encryptError && (
                   <p className="console-line text-[13px] text-red-400">
-                    &gt; error: {error}
+                    &gt; error: {encryptError}
                   </p>
                 )}
               </div>
             </div>
+          </div>
 
-            <div className="mt-5 text-center text-[13px] text-emerald-300/80 leading-relaxed px-1">
-              <p className="mb-1">
-                Encryption happens entirely inside your browser. The server only receives
-                encrypted data, never your key or plaintext file.
+          {/* PANNELLO DECRYPT */}
+          <div className="w-full lg:w-1/2">
+            <div className="panel rounded-xl p-5 h-full min-h-[420px]">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[13px] text-emerald-300 font-mono">[ DECRYPT_AREA ]</span>
+                <span className="text-[12px] text-emerald-500 font-mono">
+                  LOCAL DECRYPT · NO UPLOAD
+                </span>
+              </div>
+
+              <p className="console-line text-emerald-300/85 mb-2 text-[13px]">
+                &gt; drop an encrypted file and paste the key to recover the original
               </p>
-              <p className="mb-1">
-                If you lose the key or the link, the data cannot be recovered by us or by
-                anyone else.
-              </p>
-              <p className="mb-1">
-                This is by design: no recovery, no logs, no backdoors.
-              </p>
+              <div className="hr-line" />
+
+              <div className="mt-4 space-y-3">
+                <div
+                  className={
+                    'relative mt-1 drop-area flex flex-col items-center justify-center px-4 py-6 cursor-pointer text-center transition-colors rounded-md border ' +
+                    (isHoverDecrypt
+                      ? 'drop-area-hover border-emerald-400 bg-emerald-500/5'
+                      : 'border-emerald-800 bg-black/30 hover:border-emerald-400 hover:bg-emerald-500/5')
+                  }
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsHoverDecrypt(true);
+                  }}
+                  onDragLeave={() => setIsHoverDecrypt(false)}
+                  onDrop={handleDropDecrypt}
+                >
+                  <Upload className="mb-3 text-emerald-300" size={24} />
+                  {!encryptedFile ? (
+                    <>
+                      <p className="text-[14px] font-semibold">
+                        Drag an encrypted file (.enc) here
+                      </p>
+                      <p className="text-emerald-300/75 text-[12px] mt-1">
+                        or click to choose an .enc file from your device
+                      </p>
+                      <input
+                        type="file"
+                        accept=".enc"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={handleBrowseDecrypt}
+                      />
+                    </>
+                  ) : (
+                    <div className="max-w-full">
+                      <div className="bg-black/40 border border-emerald-800 rounded-md px-3 py-2">
+                        <p className="font-semibold text-[14px] truncate max-w-[260px] mx-auto">
+                          {encryptedFile.name}
+                        </p>
+                        <p className="text-[12px] text-emerald-300/80 mt-1">
+                          {(encryptedFile.size / 1024 / 1024).toFixed(2)} MB encrypted
+                        </p>
+                      </div>
+                      <p className="text-[12px] text-emerald-300/65 mt-2">
+                        Drop another .enc file here to replace it.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[13px] text-emerald-200/90 mb-1">
+                    Key (the same you got after encryption):
+                  </p>
+                  <input
+                    type="text"
+                    className="w-full bg-black/40 border border-emerald-800 rounded px-2 py-1.5 text-[13px] text-emerald-100"
+                    placeholder="Paste keyString here (base64:base64)"
+                    value={decryptKey}
+                    onChange={(e) => setDecryptKey(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    className="inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 font-semibold bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-50"
+                    onClick={handleDecrypt}
+                    disabled={!encryptedFile || !decryptKey}
+                  >
+                    <Lock size={15} />
+                    <span>Decrypt file locally</span>
+                  </button>
+
+                  {(encryptedFile || decryptError) && (
+                    <button
+                      className="inline-flex items-center gap-1 px-3 py-2 text-[13px] rounded-md border border-emerald-700 bg-black/40 text-emerald-200 hover:bg-black/60 transition-colors"
+                      onClick={resetDecrypt}
+                    >
+                      Clear and choose another encrypted file
+                    </button>
+                  )}
+                </div>
+
+                {decryptedUrl && (
+                  <div className="mt-2">
+                    <p className="text-[13px] text-emerald-200/90 mb-1">
+                      Decryption successful. Download the original file:
+                    </p>
+                    <a
+                      href={decryptedUrl}
+                      download={decryptedFileName}
+                      onClick={() => {
+                        setTimeout(() => {
+                          resetDecrypt();
+                        }, 0);
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-black/40 border border-emerald-700 text-[13px] hover:bg-black/60"
+                    >
+                      Download decrypted file
+                    </a>
+                  </div>
+                )}
+
+                {decryptError && (
+                  <p className="console-line text-[13px] text-red-400">
+                    &gt; error: {decryptError}
+                  </p>
+                )}
+
+                <p className="text-[11px] text-emerald-300/70 mt-1">
+                  Decrypting very large encrypted files also depends on your machine.
+                  Files larger than ~1–2 GB may fail to decrypt or can freeze the browser,
+                  because the entire file must be loaded into memory before processing.
+                </p>
+              </div>
             </div>
           </div>
         </main>
+
+        <div className="mt-1 text-center text-[13px] text-emerald-300/80 leading-relaxed px-1">
+          <p className="mb-1">
+            Encryption and decryption happen entirely inside your browser. The server
+            only ever sees encrypted blobs, never your key or plaintext file.
+          </p>
+          <p className="mb-1">
+            Large files put more stress on your CPU, RAM and browser: consider staying
+            below 1–2 GB or splitting/compressing data before encrypting it for a more
+            stable experience.
+          </p>
+        </div>
       </div>
     </div>
   );
