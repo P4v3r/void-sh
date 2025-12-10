@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { Lock, Upload, CheckCircle2, Copy, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Cloud } from 'lucide-react';
 import { encryptFile, decryptFile } from './crypto';
 import { createClient } from '@supabase/supabase-js';
+import { Dropbox, DropboxAuth } from 'dropbox';
+
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
-type Mode = 'LOCAL_ONLY' | 'UPLOAD';
+type Mode = 'LOCAL_ONLY' | 'UPLOAD' | 'DROPBOX';
 
 // --- CONFIGURAZIONE LIMITI ---
 const MAX_UPLOAD_MB = 50; // Limite richiesto 50MB
@@ -46,6 +48,10 @@ const triggerDownload = (url: string, filename: string) => {
   a.remove();
 };
 
+const DROPBOX_APP_KEY = '7oq2zp76471dpxt'; // <--- INSERISCI LA TUA KEY DROPBOX
+const REDIRECT_URI = typeof window !== 'undefined' ? window.location.origin + '/' : '';
+
+
 function App() {
   // --- STATI ENCRYPT ---
   const [file, setFile] = useState<File | null>(null);
@@ -68,9 +74,50 @@ function App() {
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [isHoverDecrypt, setIsHoverDecrypt] = useState(false);
 
+  const [dbxToken, setDbxToken] = useState<string | null>(null);
+
+
   // -------------------------
   // HANDLERS ENCRYPT
   // -------------------------
+
+  useEffect(() => {
+    if (window.location.hash.includes('access_token') && window.location.hash.includes('token_type=bearer')) {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get('access_token');
+      
+      if (accessToken) {
+        // SCENARIO POPUP: Se questa pagina è aperta dentro un popup (ha un opener)
+        if (window.opener) {
+          // Manda il token alla finestra principale
+          window.opener.postMessage({ type: 'DROPBOX_TOKEN', token: accessToken }, window.location.origin);
+          // Chiudi il popup
+          window.close();
+        } else {
+          // SCENARIO REDIRECT STANDARD (Fallback): Se non è un popup, salva il token e resta qui
+          setDbxToken(accessToken);
+          window.history.replaceState(null, '', ' '); // Pulisci l'URL
+          console.log("Dropbox Connected via Redirect!");
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Verifica sicurezza: accetta messaggi solo dalla tua stessa origine
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data?.type === 'DROPBOX_TOKEN' && event.data.token) {
+        setDbxToken(event.data.token);
+        console.log("Dropbox Connected via Popup Message!");
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const handleDropEncrypt = (e: React.DragEvent) => {
     e.preventDefault();
@@ -100,9 +147,28 @@ function App() {
     setCurrentMode(null);
   };
 
-    const startEncrypt = async (mode: Mode) => {
+  const handleDropboxAuth = async () => {
+    const dbxAuth = new DropboxAuth({ clientId: DROPBOX_APP_KEY });
+    const url = await dbxAuth.getAuthenticationUrl(REDIRECT_URI, undefined, 'token');
+    
+    // Apri un popup centrato
+    const width = 600;
+    const height = 700;
+    const left = (window.innerWidth - width) / 2;
+    const top = (window.innerHeight - height) / 2;
+    
+    window.open(url.toString(), 'dropbox_oauth', `width=${width},height=${height},top=${top},left=${left}`);
+  };
+
+
+  const startEncrypt = async (mode: Mode) => {
     if (!file) return;
     setCurrentMode(mode);
+
+    if (mode === 'DROPBOX' && !dbxToken) {
+       handleDropboxAuth();
+       return;
+    }
 
     if (mode === 'UPLOAD' && file.size > MAX_UPLOAD_BYTES) {
       setEncryptError(`Online upload limit is ${MAX_UPLOAD_MB} MB. Use Local Mode.`);
@@ -130,6 +196,31 @@ function App() {
         setStatus('DONE');
         return;
       }
+
+            // CASO 2: DROPBOX
+      if (mode === 'DROPBOX') {
+         if (!dbxToken) throw new Error("Dropbox token missing");
+         
+         const dbx = new Dropbox({ accessToken: dbxToken });
+         const safeName = sanitizeFilename(file.name); 
+         const dbxPath = `/${safeName}.enc`; 
+
+         // Conversione esplicita Blob -> File per evitare problemi con l'SDK
+         const fileToUpload = new File([encryptedBlob], safeName + '.enc', { type: 'application/octet-stream' });
+
+         console.log("Uploading to Dropbox...", dbxPath); // Debug Log
+
+         await dbx.filesUpload({
+            path: dbxPath,
+            contents: fileToUpload, // Usa il File object
+            mode: { '.tag': 'overwrite' } // Fix per TypeScript enum, a volte richiede cast as any se l'SDK è vecchio
+         });
+         
+         setShareLink(null);
+         setStatus('DONE');
+         return;
+      }
+
 
       // 3. Upload su Supabase (Nome casuale per privacy totale)
       const safeName = sanitizeFilename(file.name);
@@ -278,7 +369,7 @@ function App() {
                   void.sh
                 </span>
                 <span className="text-[12px] text-emerald-500 uppercase tracking-[0.2em] animate-pulse">
-                  _beta _V1.0
+                  _beta _V1.1
                 </span>
               </div>
               <p className="text-[14px] text-emerald-300/90 font-light tracking-tight mt-1">
@@ -360,7 +451,23 @@ function App() {
                     <Lock size={16} /> Encrypt & Share Link
                     <span className="text-[10px] opacity-70 ml-1">(MAX 50MB)</span>
                   </button>
-                  
+
+                  {!dbxToken ? (
+                    <button
+                      className="flex items-center justify-center gap-2 w-full py-3 bg-[#0061FE] hover:bg-[#0057e3] text-white font-bold text-[14px] rounded transition-colors uppercase tracking-wide"
+                      onClick={handleDropboxAuth}
+                    >
+                      <Cloud size={16} /> Connect and Save to Dropbox
+                    </button>
+                  ) : (
+                    <button
+                      className="flex items-center justify-center gap-2 w-full py-3 bg-[#0061FE] hover:bg-[#0057e3] text-white font-bold text-[14px] rounded transition-colors uppercase tracking-wide"
+                      onClick={() => startEncrypt('DROPBOX')}
+                    >
+                      <Cloud size={16} /> Save to Dropbox
+                    </button>
+                  )}
+
                   <div className="flex gap-3">
                     <button
                       className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-900/20 border border-emerald-700/50 hover:bg-emerald-800/40 text-emerald-100 font-bold text-[13px] rounded transition-colors uppercase"
@@ -431,7 +538,7 @@ function App() {
               )}
 
               {/* DONE STATE: UPLOAD (LINK) */}
-              {status === 'DONE' && currentMode === 'UPLOAD' && (
+              {status === 'DONE' && currentMode === 'UPLOAD' &&(
                 <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300 z-10">
                   <div className="flex items-center gap-2 text-emerald-300 bg-emerald-900/20 p-3 rounded border border-emerald-800/50">
                     <CheckCircle2 size={20} />
@@ -441,7 +548,9 @@ function App() {
                   {/* SHARE LINK SECTION */}
                   {shareLink && (
                     <div>
-                      <p className="text-[12px] text-emerald-400/80 mb-1 uppercase tracking-wider font-bold">&gt; Share Link</p>
+                       <p className="text-[12px] text-emerald-400/80 mb-1 uppercase tracking-wider font-bold flex items-center gap-2">
+                        &gt; Share Link <AlertTriangle size={12} className="text-yellow-500" />
+                      </p>
                       <div className="flex gap-2">
                         <input 
                           readOnly 
@@ -455,11 +564,31 @@ function App() {
                           {linkCopied ? 'COPIED!' : 'COPY'}
                         </button>
                       </div>
+                      <p className="text-[11px] text-emerald-500/50 mt-1 font-bold">
+                        !! SAVE THIS LINK. NO RECOVERY POSSIBLE. !!
+                      </p>
                     </div>
                   )}
+                  
+                  <button
+                    className="w-full mt-4 py-2 text-[12px] text-emerald-500/60 hover:text-emerald-300 transition-colors uppercase tracking-widest"
+                    onClick={resetEncrypt}
+                  >
+                    [ START NEW SESSION ]
+                  </button>
+                </div>
+              )}
+
+              {/* DONE STATE: DROPBOX */}
+              {status === 'DONE' && currentMode === 'DROPBOX' &&(
+                <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300 z-10">
+                  <div className="flex items-center gap-2 text-emerald-300 bg-emerald-900/20 p-3 rounded border border-emerald-800/50">
+                    <CheckCircle2 size={20} />
+                    <span className="font-bold tracking-wide text-[14px]">ENCRYPTION SUCCESSFUL</span>
+                  </div>
 
                   {/* KEY SECTION */}
-                  {/*{keyString && (
+                  {keyString && (
                     <div>
                       <p className="text-[12px] text-emerald-400/80 mb-1 uppercase tracking-wider font-bold flex items-center gap-2">
                         &gt; Decryption Key <AlertTriangle size={12} className="text-yellow-500" />
@@ -478,10 +607,10 @@ function App() {
                         </button>
                       </div>
                       <p className="text-[11px] text-emerald-500/50 mt-1 font-bold">
-                        !! USE IT IF YOU LOST THE SHARE LINK !!
+                        !! SAVE THIS KEY. NO RECOVERY POSSIBLE. !!
                       </p>
                     </div>
-                  )}*/}
+                  )}
 
                   <button
                     className="w-full mt-4 py-2 text-[12px] text-emerald-500/60 hover:text-emerald-300 transition-colors uppercase tracking-widest"
@@ -606,7 +735,7 @@ function App() {
         <footer className="mt-8 text-center opacity-60">
            <p className="text-[12px] text-emerald-500/60 max-w-3xl mx-auto leading-relaxed font-light">
              // SECURITY NOTICE: WE CANNOT SEE CONTENTS. FILES ARE STORED AS RANDOMIZED, ENCRYPTED BLOBS. <br/>
-             // UPLOAD LIMIT: {MAX_UPLOAD_MB}MB (Online) / UNLIMITED (Local) <br/>
+             // UPLOAD LIMIT: {MAX_UPLOAD_MB}MB (Online) / UNLIMITED (Local & Dropbox) <br/>
              // WARNING: LARGE FILES (&gt;1GB) MAY REQUIRE SIGNIFICANT RAM
            </p>
         </footer>

@@ -17,3 +17,5 @@ Aggiunte:
 - aggiunta password da salvare invece di key
 
 - We do not store IP addresses or user activity. Minimal connection logs may be temporarily retained by our infrastructure providers (Vercel/Supabase) solely for security and DDoS protection.
+
+- Using Dropbox requires logging in. Dropbox will know you uploaded a file, but they cannot read its content (Zero Knowledge).
