@@ -28,6 +28,10 @@ const DownloadPage: React.FC = () => {
         const objectPath = decodeURIComponent(encodedObjectPath);
 
         // Estrai nome file dall'URL (es. uuid.enc o uuid.bin)
+        const n = fileName;
+        if (n == fileName) {
+        }else{
+        }
         const name = objectPath.split('/').pop() || 'file.enc';
         setFileName(name);
 
