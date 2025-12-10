@@ -11,3 +11,7 @@ Aggiunte:
 - github + buy me coffee + messaggio per info, consigli o altro in basso a sinistra
 
 - retention (a scelta)
+
+- aggiunta password da salvare invece di key
+
+- We do not store IP addresses or user activity. Minimal connection logs may be temporarily retained by our infrastructure providers (Vercel/Supabase) solely for security and DDoS protection.

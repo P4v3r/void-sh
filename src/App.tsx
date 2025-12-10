@@ -134,6 +134,7 @@ function App() {
       // 3. Upload su Supabase (Nome casuale per privacy totale)
       const safeName = sanitizeFilename(file.name);
       const fileExt = safeName.split('.').pop();
+      
       const randomName = `${crypto.randomUUID()}.${fileExt || 'bin'}`;
       const objectPath = `files/${randomName}`;
 
@@ -277,7 +278,7 @@ function App() {
                   void.sh
                 </span>
                 <span className="text-[12px] text-emerald-500 uppercase tracking-[0.2em] animate-pulse">
-                  _beta
+                  _beta _V1.0
                 </span>
               </div>
               <p className="text-[14px] text-emerald-300/90 font-light tracking-tight mt-1">
@@ -287,6 +288,7 @@ function App() {
             <div className="text-right text-[12px] text-emerald-500 space-y-0.5 hidden sm:block opacity-70">
               <p>[ CLIENT-SIDE ONLY ]</p>
               <p>[ OPEN SOURCE ]</p>
+              <p>[ NO USER LOGS ]</p>
             </div>
           </div>
           <div className="h-px bg-emerald-900/50 mt-4" />
@@ -303,7 +305,7 @@ function App() {
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <span className="text-[14px] text-emerald-400 tracking-widest font-bold">:: ENCRYPT ::</span>
                 <span className="text-[12px] text-emerald-600">
-                  [{status === 'IDLE' ? 'IDLE' : status === 'READY' ? 'READY' : status === 'ENCRYPTING' ? 'BUSY' : 'DONE'}]
+                  [{status === 'IDLE' ? ' IDLE ' : status === 'READY' ? ' READY ' : status === 'ENCRYPTING' ? ' BUSY ' : ' DONE '}]
                 </span>
               </div>
 
@@ -401,11 +403,21 @@ function App() {
                     {/* KEY DISPLAY */}
                     {keyString && (
                         <div className="mt-4 text-left">
-                          <p className="text-[11px] text-emerald-400/80 mb-1 uppercase tracking-wider font-bold">&gt; Key (Save it!)</p>
+                          <p className="text-[12px] text-emerald-400/80 mb-1 uppercase tracking-wider font-bold flex items-center gap-2">
+                            &gt; Decryption Key <AlertTriangle size={12} className="text-yellow-500" />
+                          </p>
                           <div className="flex gap-2">
                             <input readOnly value={keyString} className="flex-1 bg-black/30 border border-emerald-800 rounded px-2 py-1 text-[12px] text-emerald-200 font-mono outline-none"/>
-                             <button onClick={copyKey} className="px-3 bg-emerald-600/20 border border-emerald-600/50 hover:bg-emerald-500 hover:text-black text-emerald-300 rounded text-[11px] font-bold uppercase">COPY</button>
+                             <button
+                              onClick={copyKey}
+                              className="px-3 py-2 bg-emerald-600/20 border border-emerald-600/50 hover:bg-emerald-500 hover:text-black text-emerald-300 rounded transition-all font-bold uppercase text-[12px] min-w-[70px] flex items-center justify-center gap-1"
+                            >
+                              {keyCopied ? 'COPIED!' : <><Copy size={12}/> COPY</>}
+                            </button>
                           </div>
+                          <p className="text-[11px] text-emerald-500/50 mt-1 font-bold">
+                            !! SAVE THIS KEY. NO RECOVERY POSSIBLE. !!
+                          </p>
                         </div>
                     )}
                     
@@ -447,7 +459,7 @@ function App() {
                   )}
 
                   {/* KEY SECTION */}
-                  {keyString && (
+                  {/*{keyString && (
                     <div>
                       <p className="text-[12px] text-emerald-400/80 mb-1 uppercase tracking-wider font-bold flex items-center gap-2">
                         &gt; Decryption Key <AlertTriangle size={12} className="text-yellow-500" />
@@ -466,10 +478,10 @@ function App() {
                         </button>
                       </div>
                       <p className="text-[11px] text-emerald-500/50 mt-1 font-bold">
-                        !! SAVE THIS KEY. NO RECOVERY POSSIBLE !!
+                        !! USE IT IF YOU LOST THE SHARE LINK !!
                       </p>
                     </div>
-                  )}
+                  )}*/}
 
                   <button
                     className="w-full mt-4 py-2 text-[12px] text-emerald-500/60 hover:text-emerald-300 transition-colors uppercase tracking-widest"
@@ -496,7 +508,7 @@ function App() {
               
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <span className="text-[14px] text-emerald-400 tracking-widest font-bold">:: DECRYPT ::</span>
-                <span className="text-[12px] text-emerald-600 font-bold">[ LOCAL ]</span>
+                <span className="text-[12px] text-emerald-600 font">[ LOCAL ]</span>
               </div>
 
               <div className="text-[12px] space-y-1 mb-4 opacity-70 relative z-10">
@@ -594,7 +606,6 @@ function App() {
         <footer className="mt-8 text-center opacity-60">
            <p className="text-[12px] text-emerald-500/60 max-w-3xl mx-auto leading-relaxed font-light">
              // SECURITY NOTICE: WE CANNOT SEE CONTENTS. FILES ARE STORED AS RANDOMIZED, ENCRYPTED BLOBS. <br/>
-             // WARNING: WITHOUT YOUR KEY, DATA IS UNRECOVERABLE.  <br/> <br/>
              // UPLOAD LIMIT: {MAX_UPLOAD_MB}MB (Online) / UNLIMITED (Local) <br/>
              // WARNING: LARGE FILES (&gt;1GB) MAY REQUIRE SIGNIFICANT RAM
            </p>
