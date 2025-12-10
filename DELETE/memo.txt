@@ -7,6 +7,8 @@ Aggiunte:
 - eredità digitale (dead man’s switch) che libera la chiave a un contatto se smetti di “pingare” il sito;​
 
 - modalità “BYO storage”: cifri in locale e poi connetti Google Drive/Dropbox dell’utente via API e carichi lì in forma cifrata, quindi tu non paghi storage ma dai la privacy che Google non dà.
+    Dropbox
+    🖕 Google
 
 - github + buy me coffee + messaggio per info, consigli o altro in basso a sinistra
 
