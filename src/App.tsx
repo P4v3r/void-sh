@@ -479,7 +479,7 @@ function App() {
                   void.sh
                 </span>
                 <span className="text-[12px] text-emerald-500 uppercase tracking-[0.2em] animate-pulse">
-                  _beta _V1.1
+                  _beta _V2.1
                 </span>
               </div>
               <p className="text-[14px] text-emerald-300/90 font-light tracking-tight mt-1">
