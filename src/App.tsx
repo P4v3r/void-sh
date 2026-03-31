@@ -4,6 +4,7 @@ import { encryptFile, decryptFile } from './crypto';
 import { createClient } from '@supabase/supabase-js';
 import { Dropbox, DropboxAuth } from 'dropbox';
 import CONFIG from './config';
+import Toast from './components/Toast';
 
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
@@ -94,6 +95,9 @@ function App() {
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [encryptError, setEncryptError] = useState<string | null>(null);
 
+  // --- TOAST STATE ---
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
   // --- STATI DECRYPT ---
   const [encryptedFile, setEncryptedFile] = useState<File | null>(null);
   const [decryptKey, setDecryptKey] = useState<string>('');
@@ -101,6 +105,9 @@ function App() {
   const [decryptedFileName, setDecryptedFileName] = useState<string>('decrypted');
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [isHoverDecrypt, setIsHoverDecrypt] = useState(false);
+
+  // --- PROGRESS STATE ---
+  const [encryptProgress, setEncryptProgress] = useState(0);
 
   const [dbxToken, setDbxToken] = useState<string | null>(null);
 
@@ -277,7 +284,7 @@ function App() {
       // Passiamo customPassword solo se usePassword è true, altrimenti undefined/null
       const passwordToUse = usePassword ? customPassword : undefined;
 
-      const { encryptedBlob, keyString: usedKey } = await encryptFile(file, passwordToUse);
+      const { encryptedBlob, keyString: usedKey } = await encryptFile(file, passwordToUse, setEncryptProgress);
 
       // Se abbiamo usato la password custom, la chiave usata è quella.
       // Se non l'abbiamo usata, encryptFile ne ha generata una.
@@ -398,6 +405,7 @@ function App() {
     if (!shareLink) return;
     navigator.clipboard.writeText(shareLink);
     setLinkCopied(true);
+    setToast({ message: 'Link copied to clipboard!', type: 'success' });
     setTimeout(() => setLinkCopied(false), 1200);
   };
 
@@ -405,6 +413,7 @@ function App() {
     if (!keyString) return;
     navigator.clipboard.writeText(keyString);
     setKeyCopied(true);
+    setToast({ message: 'Key copied to clipboard!', type: 'success' });
     setTimeout(() => setKeyCopied(false), 1200);
   };
 
@@ -822,9 +831,22 @@ function App() {
 
               {/* LOADING STATE */}
               {status === 'ENCRYPTING' && (
-                <div className="mt-8 flex flex-col items-center justify-center text-emerald-300 animate-pulse z-10">
-                  <Lock size={36} className="mb-3" />
-                  <p className="text-[15px] tracking-widest">ENCRYPTING_DATA...</p>
+                <div className="mt-8 flex flex-col items-center justify-center text-emerald-300 z-10">
+                  <Lock size={36} className="mb-4 animate-pulse" />
+                  <p className="text-[15px] tracking-widest mb-4">ENCRYPTING_DATA...</p>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full max-w-xs">
+                    <div className="h-2 bg-emerald-900/50 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-500 transition-all duration-300 ease-out"
+                        style={{ width: `${encryptProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-emerald-400/70 mt-2 text-center">
+                      {encryptProgress}%
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1105,6 +1127,9 @@ function App() {
              // WARNING: LARGE FILES (&gt;1GB) MAY REQUIRE SIGNIFICANT RAM
            </p>
         </footer>
+
+        {/* Toast Notifications */}
+        {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       </div>
     </div>

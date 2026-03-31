@@ -59,33 +59,45 @@ export type EncryptResult = {
   keyString: string;
 };
 
+type ProgressCallback = (progress: number) => void;
+
 // --- ENCRYPT ---
-export async function encryptFile(file: File, password?: string): Promise<EncryptResult> {
+export async function encryptFile(
+  file: File, 
+  password?: string,
+  onProgress?: ProgressCallback
+): Promise<EncryptResult> {
   let key: CryptoKey;
   let keyString = '';
   const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  onProgress?.(5);
 
   if (password) {
     // MODALITÀ PASSWORD
     const salt = crypto.getRandomValues(new Uint8Array(16));
     key = await deriveKeyFromPassword(password, salt);
+    onProgress?.(30);
     
     keyString = password; // Ritorniamo la password all'UI
     
     const fileBuffer = await file.arrayBuffer();
+    onProgress?.(50);
+    
     const encrypted = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv },
       key,
       fileBuffer
     );
+    onProgress?.(80);
     
     // Costruiamo il Blob finale: [SALT] + [IV] + [EncryptedData]
-    // TypeScript Fix: Specifichiamo i tipi espliciti o castiamo se necessario, 
-    // ma qui basta usare Uint8Array standard che è compatibile.
     const combinedBuffer = new Uint8Array(salt.byteLength + iv.byteLength + encrypted.byteLength);
     combinedBuffer.set(salt, 0);
     combinedBuffer.set(iv, salt.byteLength);
     combinedBuffer.set(new Uint8Array(encrypted), salt.byteLength + iv.byteLength);
+    
+    onProgress?.(100);
     
     return { 
         encryptedBlob: new Blob([combinedBuffer], { type: 'application/octet-stream' }), 
@@ -95,19 +107,25 @@ export async function encryptFile(file: File, password?: string): Promise<Encryp
   } else {
     // MODALITÀ RANDOM KEY
     key = await generateKey();
+    onProgress?.(30);
     
     const fileBuffer = await file.arrayBuffer();
+    onProgress?.(50);
+    
     const encrypted = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv },
       key,
       fileBuffer
     );
+    onProgress?.(80);
 
     const rawKey = await crypto.subtle.exportKey('raw', key);
     const keyB64 = arrayBufferToBase64(rawKey);
     const ivB64 = arrayBufferToBase64(iv.buffer);
     
     keyString = `${keyB64}:${ivB64}`;
+    
+    onProgress?.(100);
     
     return { 
         encryptedBlob: new Blob([encrypted], { type: 'application/octet-stream' }), 
