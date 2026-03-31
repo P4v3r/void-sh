@@ -330,9 +330,9 @@ function App() {
 
       setStatus('DONE');
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setEncryptError(err.message || "Encryption failed");
+      setEncryptError(err instanceof Error ? err.message : "Encryption failed");
       setStatus('IDLE');
     }
   };

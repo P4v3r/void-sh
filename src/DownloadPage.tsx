@@ -67,10 +67,6 @@ const [status, setStatus] = useState<'INITIALIZING' | 'DOWNLOADING' | 'DECRYPTIN
             throw new Error('File download failed. It may have been deleted.');
         }
 
-        const encBlob = new Blob([data]); // Assicurati sia un Blob
-        setEncryptedBlob(encBlob);
-
-        // SALVIAMO IL BLOB CRIPTATO (Ci serve se dobbiamo chiedere la password)
         const encFile = new Blob([data]);
         setEncryptedBlob(encFile);
 
@@ -110,9 +106,9 @@ const [status, setStatus] = useState<'INITIALIZING' | 'DOWNLOADING' | 'DECRYPTIN
             setStatus('PASSWORD_REQUIRED');
         }
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        setError(err.message || 'Processing failed.');
+        setError(err instanceof Error ? err.message : 'Processing failed.');
         setStatus('ERROR');
       }
     };
@@ -141,7 +137,7 @@ const [status, setStatus] = useState<'INITIALIZING' | 'DOWNLOADING' | 'DECRYPTIN
     try {
         setStatus('DECRYPTING');
         // Tentativo di decrittazione con la password inserita
-        const decryptedBlob = await decryptFile(encryptedBlob as any, inputPassword);
+        const decryptedBlob = await decryptFile(encryptedBlob as Blob, inputPassword);
         
         const url = URL.createObjectURL(decryptedBlob);
         decryptedUrlRef.current = url;

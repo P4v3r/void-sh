@@ -33,7 +33,7 @@ async function deriveKeyFromPassword(password: string, salt: Uint8Array): Promis
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt as any,
+      salt,
       iterations: 100000,
       hash: 'SHA-256',
     },
@@ -164,7 +164,7 @@ export async function decryptFile(
             data
           );
           return new Blob([decrypted]);
-      } catch (e) {
+      } catch {
           throw new Error("Decryption failed. Wrong password?");
       }
   }
