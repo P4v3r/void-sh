@@ -2,13 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Download, AlertTriangle, CheckCircle2, FileDown, Copy, Lock, EyeOff, Eye, Unlock } from 'lucide-react';
 import { decryptFile } from './crypto';
+import CONFIG from './config';
 
-// --- SUPABASE CONFIG ---
-const supabaseUrl = 'https://rsnjdhkrgtuepivllvux.supabase.co';
-const supabaseAnonKey =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzbmpkaGtyZ3R1ZXBpdmxsdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxODExNTEsImV4cCI6MjA4MDc1NzE1MX0.WKxJB0TMJw3_zBvQsI3vpQxWbrT824OzdHtefgnNvPo';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
 const DownloadPage: React.FC = () => {
 const [status, setStatus] = useState<'INITIALIZING' | 'DOWNLOADING' | 'DECRYPTING' | 'COMPLETED' | 'ERROR' | 'PASSWORD_REQUIRED'>('INITIALIZING');

@@ -3,24 +3,14 @@ import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Cloud, Computer, Setti
 import { encryptFile, decryptFile } from './crypto';
 import { createClient } from '@supabase/supabase-js';
 import { Dropbox, DropboxAuth } from 'dropbox';
+import CONFIG from './config';
 
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
 type Mode = 'LOCAL_ONLY' | 'UPLOAD' | 'DROPBOX';
 
-
-// --- CONFIGURAZIONE LIMITI ---
-const MAX_UPLOAD_MB = 50; // Limite richiesto 50MB
-const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
-const HARD_MAX_MB = 2048;
-const HARD_MAX_BYTES = HARD_MAX_MB * 1024 * 1024;
-
-// --- SUPABASE CONFIG ---
-const supabaseUrl = 'https://rsnjdhkrgtuepivllvux.supabase.co';
-const supabaseAnonKey =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzbmpkaGtyZ3R1ZXBpdmxsdnV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxODExNTEsImV4cCI6MjA4MDc1NzE1MX0.WKxJB0TMJw3_zBvQsI3vpQxWbrT824OzdHtefgnNvPo';
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// --- SUPABASE CLIENT ---
+const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
 // --- UTILS ---
 /*const sanitizeFilename = (name: string): string => {
@@ -31,10 +21,17 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
   return cleaned || 'file.bin';
 };*/
 
-const isIOSLike = () =>
-  typeof navigator !== 'undefined' &&
-  (/iP(hone|od|ad)/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1));
+const isIOSLike = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const platform = navigator.platform;
+  const maxTouchPoints = (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints || 0;
+  return (
+    /iP(hone|od|ad)/.test(ua) ||
+    (platform === 'MacIntel' && maxTouchPoints > 1) ||
+    (platform === 'iPad' && maxTouchPoints > 1)
+  );
+};
 
 const triggerDownload = (url: string, filename: string) => {
   if (isIOSLike()) {
@@ -49,8 +46,7 @@ const triggerDownload = (url: string, filename: string) => {
   a.remove();
 };
 
-const DROPBOX_APP_KEY = '7oq2zp76471dpxt'; // <--- INSERISCI LA TUA KEY DROPBOX
-const REDIRECT_URI = typeof window !== 'undefined' ? window.location.origin + '/' : '';
+
 
 function App() {
 
@@ -160,8 +156,8 @@ function App() {
   };
 
   const validateAndSetFile = (f: File) => {
-    if (f.size > HARD_MAX_BYTES) {
-      setEncryptError(`File too large (> ${HARD_MAX_MB} MB).`);
+    if (f.size > CONFIG.HARD_MAX_BYTES) {
+      setEncryptError(`File too large (> ${CONFIG.HARD_MAX_MB} MB).`);
       return;
     }
     setFile(f);
@@ -174,8 +170,8 @@ function App() {
   };
 
   const handleDropboxAuth = async () => {
-    const dbxAuth = new DropboxAuth({ clientId: DROPBOX_APP_KEY });
-    const url = await dbxAuth.getAuthenticationUrl(REDIRECT_URI, undefined, 'token');
+    const dbxAuth = new DropboxAuth({ clientId: CONFIG.DROPBOX_APP_KEY });
+    const url = await dbxAuth.getAuthenticationUrl(CONFIG.DROPBOX_REDIRECT_URI, undefined, 'token');
     
     // Apri un popup centrato
     const width = 600;
@@ -196,8 +192,8 @@ function App() {
        return;
     }
 
-    if (mode === 'UPLOAD' && file.size > MAX_UPLOAD_BYTES) {
-      setEncryptError(`Online upload limit is ${MAX_UPLOAD_MB} MB. Use Local Mode.`);
+    if (mode === 'UPLOAD' && file.size > CONFIG.MAX_UPLOAD_BYTES) {
+      setEncryptError(`Online upload limit is ${CONFIG.MAX_UPLOAD_MB} MB. Use Local Mode.`);
       setStatus('READY');
       return;
     }
@@ -406,8 +402,8 @@ function App() {
   };
 
   const validateAndSetEncryptedFile = (f: File) => {
-    if (f.size > HARD_MAX_BYTES) {
-      setDecryptError(`File too large (> ${HARD_MAX_MB} MB).`);
+    if (f.size > CONFIG.HARD_MAX_BYTES) {
+      setDecryptError(`File too large (> ${CONFIG.HARD_MAX_MB} MB).`);
       return;
     }
     setEncryptedFile(f);
@@ -1040,7 +1036,7 @@ function App() {
         <footer className="mt-8 text-center opacity-60">
            <p className="text-[12px] text-emerald-500/60 max-w-3xl mx-auto leading-relaxed font-light">
              // SECURITY NOTICE: WE CANNOT SEE CONTENTS. FILES ARE STORED AS RANDOMIZED, ENCRYPTED BLOBS. <br/>
-             // UPLOAD LIMIT: {MAX_UPLOAD_MB}MB (Online) / UNLIMITED (Local & Dropbox) <br/>
+             // UPLOAD LIMIT: {CONFIG.MAX_UPLOAD_MB}MB (Online) / UNLIMITED (Local & Dropbox) <br/>
              // WARNING: LARGE FILES (&gt;1GB) MAY REQUIRE SIGNIFICANT RAM
            </p>
         </footer>
