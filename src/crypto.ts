@@ -1,4 +1,5 @@
 // crypto.ts
+import CONFIG from './config';
 
 // --- UTILS ---
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -34,7 +35,7 @@ async function deriveKeyFromPassword(password: string, salt: Uint8Array): Promis
     {
       name: 'PBKDF2',
       salt,
-      iterations: 100000,
+      iterations: CONFIG.PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
     keyMaterial,

@@ -46,6 +46,35 @@ const triggerDownload = (url: string, filename: string) => {
   a.remove();
 };
 
+// Sanitize filename to prevent path traversal and other issues
+const sanitizeFilename = (name: string): string => {
+  // Remove path separators
+  let base = name.split(/[\\/]/).pop() || 'file';
+  
+  // Normalize unicode
+  base = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  
+  // Remove control characters and dangerous symbols
+  base = base.split('').filter(char => {
+    const code = char.charCodeAt(0);
+    // Allow: letters, numbers, space, hyphen, underscore, dot
+    return (code >= 32 && code !== 34 && code !== 60 && code !== 62 && 
+            code !== 124 && code !== 127);
+  }).join('');
+  
+  // Replace multiple spaces/underscores with single
+  base = base.replace(/[_\s]+/g, '_').replace(/^_|_$/g, '');
+  
+  // Limit length
+  const maxLength = 200;
+  if (base.length > maxLength) {
+    const ext = base.split('.').pop() || '';
+    base = base.substring(0, maxLength - ext.length - 1) + '.' + ext;
+  }
+  
+  return base || 'file.bin';
+};
+
 
 
 function App() {
@@ -74,6 +103,31 @@ function App() {
   const [isHoverDecrypt, setIsHoverDecrypt] = useState(false);
 
   const [dbxToken, setDbxToken] = useState<string | null>(null);
+
+  // --- DROPBOX TOKEN PERSISTENCE ---
+  const DROPBOX_TOKEN_KEY = 'voidsh_dropbox_token';
+
+  // Load token from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(DROPBOX_TOKEN_KEY);
+    if (stored) {
+      setDbxToken(stored);
+    }
+  }, []);
+
+  // Save token to localStorage when it changes
+  useEffect(() => {
+    if (dbxToken) {
+      localStorage.setItem(DROPBOX_TOKEN_KEY, dbxToken);
+    } else {
+      localStorage.removeItem(DROPBOX_TOKEN_KEY);
+    }
+  }, [dbxToken]);
+
+  // Logout function
+  const handleDropboxLogout = () => {
+    setDbxToken(null);
+  };
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
@@ -160,7 +214,10 @@ function App() {
       setEncryptError(`File too large (> ${CONFIG.HARD_MAX_MB} MB).`);
       return;
     }
-    setFile(f);
+    // Sanitize filename to prevent path traversal
+    const safeName = sanitizeFilename(f.name);
+    const safeFile = new File([f], safeName, { type: f.type });
+    setFile(safeFile);
     setStatus('READY');
     setDownloadUrl(null);
     setKeyString(null);
@@ -602,13 +659,21 @@ function App() {
                         <Cloud size={14} /> Connect Dropbox
                       </button>
                     ) : (
-                      <button
-                        disabled={!file}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#0061FE] hover:bg-[#0057e3] text-white font-bold text-[13px] rounded transition-colors uppercase tracking-wide px-2 disabled:cursor-not-allowed"
-                        onClick={() => startEncrypt('DROPBOX')}
-                      >
-                        <Cloud size={14} /> Save to Dropbox
-                      </button>
+                      <div className="flex-1 flex flex-col gap-1">
+                        <button
+                          disabled={!file}
+                          className="flex items-center justify-center gap-2 py-3 bg-[#0061FE] hover:bg-[#0057e3] text-white font-bold text-[13px] rounded transition-colors uppercase tracking-wide px-2 disabled:cursor-not-allowed"
+                          onClick={() => startEncrypt('DROPBOX')}
+                        >
+                          <Cloud size={14} /> Save to Dropbox
+                        </button>
+                        <button
+                          onClick={handleDropboxLogout}
+                          className="text-[10px] text-red-400/50 hover:text-red-300 transition-colors text-center"
+                        >
+                          Disconnect
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
