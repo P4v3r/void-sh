@@ -11,9 +11,8 @@ interface UseP2PResult {
   isHost: boolean;
   offerCode: string | null;
   answerCode: string | null;
-  startHost: () => Promise<{ roomCode: string; offerCode: string }>;
-  joinWithOfferCode: (code: string) => Promise<void>;
-  completeConnection: (answerCode: string) => Promise<void>;
+  startHost: () => Promise<{ roomCode: string }>;
+  joinWithCode: (roomCode: string) => Promise<void>;
   sendFile: (file: File) => Promise<void>;
   receivedFile: Blob | null;
   receivedFileName: string | null;
@@ -57,7 +56,7 @@ export function useP2P(): UseP2PResult {
 
   const startHost = useCallback(async () => {
     if (startedRef.current && connectionRef.current) {
-      return { roomCode: roomCode || '', offerCode: offerCode || '' };
+      return { roomCode: roomCode || '' };
     }
     setError(null);
     setConnectionState('CONNECTING');
@@ -70,32 +69,25 @@ export function useP2P(): UseP2PResult {
 
     const result = await connection.createOffer();
     setRoomCode(result.roomCode);
-    setOfferCode(result.offerCode);
+    setOfferCode(result.roomCode);
 
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const joinWithOfferCode = useCallback(async (offerCodeStr: string) => {
+  const joinWithCode = useCallback(async (rc: string) => {
     if (startedRef.current && connectionRef.current) return;
     setError(null);
     setConnectionState('CONNECTING');
     setIsHost(false);
-    setOfferCode(null);
     startedRef.current = true;
 
     const connection = new P2PConnection(events);
     connectionRef.current = connection;
 
-    await connection.joinWithOfferCode(offerCodeStr);
-    const answer = connection.getAnswerCode();
-    setAnswerCode(answer);
+    await connection.joinRoom(rc);
+    setRoomCode(rc);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const completeConnection = useCallback(async (answerCodeStr: string) => {
-    if (!connectionRef.current) throw new Error('No active connection');
-    await connectionRef.current.completeWithAnswerCode(answerCodeStr);
   }, []);
 
   const sendFile = useCallback(async (file: File) => {
@@ -127,12 +119,12 @@ export function useP2P(): UseP2PResult {
     setTransferProgress(null);
   }, []);
 
-  // Auto-join from URL hash link
+  // Auto-join from URL hash
   useEffect(() => {
     const parsed = parseConnectionLink(window.location.href);
-    if (parsed?.offerCode) {
+    if (parsed?.roomCode) {
       window.location.hash = '';
-      joinWithOfferCode(parsed.offerCode);
+      joinWithCode(parsed.roomCode);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -150,8 +142,7 @@ export function useP2P(): UseP2PResult {
     offerCode,
     answerCode,
     startHost,
-    joinWithOfferCode,
-    completeConnection,
+    joinWithCode,
     sendFile,
     receivedFile,
     receivedFileName,

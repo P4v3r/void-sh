@@ -1,8 +1,9 @@
 // src/p2p/connection.ts
 
 import { ICE_SERVERS } from './servers';
-import { generateRoomCode, generateOfferCode, parseOfferCode } from './signaling';
-import type { ConnectionState, TransferProgress, FileMetadata, FileChunkMessage } from './types';
+import { generateRoomCode } from './signaling';
+import { db, ref, onValue, set, remove, get } from '../firebase';
+import type { ConnectionState, TransferProgress, FileChunkMessage } from './types';
 import CONFIG from '../config';
 
 export type ConnectionEvents = {
@@ -23,80 +24,120 @@ export class P2PConnection {
   private transferStartTime: number = 0;
   private fileSize: number = 0;
   private fileName: string = '';
+  private listeners: Array<() => void> = [];
 
   constructor(events: ConnectionEvents) {
     this.events = events;
   }
 
   // Create offer as host
-  async createOffer(): Promise<{ roomCode: string; offerCode: string }> {
+  async createOffer(): Promise<{ roomCode: string }> {
     this.roomCode = generateRoomCode();
     this.setupPeerConnection();
-    
-    // Create data channel
-    this.dataChannel = this.peerConnection!.createDataChannel('fileTransfer', {
-      ordered: true,
-    });
+
+    this.dataChannel = this.peerConnection!.createDataChannel('fileTransfer', { ordered: true });
     this.setupDataChannel(this.dataChannel);
-    
-    // Create offer
+
     const offer = await this.peerConnection!.createOffer();
     await this.peerConnection!.setLocalDescription(offer);
-    
-    // Wait for ICE gathering to complete
     await this.waitForIceGathering();
-    
-    const offerCode = generateOfferCode(this.peerConnection!.localDescription!);
-    
-    return { roomCode: this.roomCode, offerCode };
+
+    // Write offer to Firebase
+    const localDesc = this.peerConnection!.localDescription!;
+    await set(ref(db, `rooms/${this.roomCode}/offer`), {
+      type: localDesc.type,
+      sdp: localDesc.sdp,
+    });
+
+    // Listen for answer
+    this.listenForAnswer();
+
+    // Send ICE candidates as they arrive
+    this.sendIceCandidates('host');
+
+    return { roomCode: this.roomCode };
   }
 
-  // Join as receiver using offer code
-  async joinWithOfferCode(offerCode: string): Promise<string> {
-    const offer = parseOfferCode(offerCode);
-    if (!offer) {
-      throw new Error('Invalid offer code');
-    }
-    
-    this.roomCode = generateRoomCode(); // Generate response room code
+  // Join as receiver
+  async joinRoom(roomCode: string): Promise<void> {
+    this.roomCode = roomCode;
     this.setupPeerConnection();
-    
+
     // Wait for data channel from host
     this.peerConnection!.ondatachannel = (event) => {
       this.dataChannel = event.channel;
       this.setupDataChannel(this.dataChannel);
     };
-    
-    await this.peerConnection!.setRemoteDescription(offer);
-    
+
+    // Read offer from Firebase
+    const offerSnap = await get(ref(db, `rooms/${roomCode}/offer`));
+    if (!offerSnap.exists()) {
+      throw new Error('Room not found or expired');
+    }
+
+    const offerData = offerSnap.val();
+    await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(offerData));
+
+    // Listen for ICE candidates from host
+    this.listenForIceCandidates('host');
+
     // Create answer
     const answer = await this.peerConnection!.createAnswer();
     await this.peerConnection!.setLocalDescription(answer);
-    
-    // Wait for ICE gathering
     await this.waitForIceGathering();
-    
-    return this.roomCode;
+
+    // Write answer to Firebase
+    const localDesc = this.peerConnection!.localDescription!;
+    await set(ref(db, `rooms/${roomCode}/answer`), {
+      type: localDesc.type,
+      sdp: localDesc.sdp,
+    });
+
+    // Send ICE candidates
+    this.sendIceCandidates('guest');
   }
 
-  // Get answer code to send back
-  getAnswerCode(): string {
-    if (!this.peerConnection?.localDescription) {
-      throw new Error('No local description');
-    }
-    return generateOfferCode(this.peerConnection.localDescription);
+  private listenForAnswer(): void {
+    const answerRef = ref(db, `rooms/${this.roomCode}/answer`);
+    const unsub = onValue(answerRef, async (snapshot) => {
+      if (!snapshot.exists() || !this.peerConnection) return;
+      const answerData = snapshot.val();
+      unsub();
+      await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answerData));
+    });
+    this.listeners.push(unsub);
   }
 
-  // Complete connection with answer code (host side)
-  async completeWithAnswerCode(answerCode: string): Promise<void> {
-    const answer = parseOfferCode(answerCode);
-    if (!answer) {
-      throw new Error('Invalid answer code');
-    }
-    await this.peerConnection!.setRemoteDescription(answer);
+  private listenForIceCandidates(from: 'host' | 'guest'): void {
+    const path = `rooms/${this.roomCode}/ice/${from}`;
+    const unsub = onValue(ref(db, path), (snapshot) => {
+      if (!snapshot.exists() || !this.peerConnection) return;
+      const candidates = snapshot.val();
+      if (Array.isArray(candidates)) {
+        candidates.forEach(async (c: RTCIceCandidateInit) => {
+          try {
+            await this.peerConnection!.addIceCandidate(new RTCIceCandidate(c));
+          } catch {
+            // ignore bad candidates
+          }
+        });
+      }
+    });
+    this.listeners.push(unsub);
   }
 
-  // Send file in chunks
+  private sendIceCandidates(role: 'host' | 'guest'): void {
+    const path = `rooms/${this.roomCode}/ice/${role}`;
+    const candidates: RTCIceCandidateInit[] = [];
+
+    this.peerConnection!.onicecandidate = (event) => {
+      if (event.candidate) {
+        candidates.push(event.candidate.toJSON());
+        set(ref(db, path), candidates);
+      }
+    };
+  }
+
   async sendFile(file: File): Promise<void> {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
       throw new Error('Data channel not ready');
@@ -104,67 +145,50 @@ export class P2PConnection {
 
     this.transferStartTime = Date.now();
     this.bytesTransferred = 0;
-    
-    // Calculate chunks
+
     const chunkSize = CONFIG.CHUNK_SIZE;
     const totalChunks = Math.ceil(file.size / chunkSize);
     this.totalChunks = totalChunks;
     this.fileSize = file.size;
     this.fileName = file.name;
-    
-    // Send file metadata first
-    const metadata: FileMetadata = {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      totalChunks,
-    };
-    
+
     const metaMessage: FileChunkMessage = {
       type: 'file-meta',
-      metadata,
+      metadata: { name: file.name, size: file.size, type: file.type, totalChunks },
     };
     this.dataChannel.send(JSON.stringify(metaMessage));
-    
-    // Send chunks
+
     const buffer = await file.arrayBuffer();
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, file.size);
       const chunk = buffer.slice(start, end);
       const isLast = i === totalChunks - 1;
-      
-      // Create chunk message
+
       const chunkMessage: FileChunkMessage = {
         type: 'file-chunk',
         index: i,
         data: Array.from(new Uint8Array(chunk)),
         isLast,
       };
-      
-      this.dataChannel!.send(JSON.stringify(chunkMessage));
-      
+
+      this.dataChannel.send(JSON.stringify(chunkMessage));
       this.bytesTransferred += chunk.byteLength;
       this.reportProgress(file.size);
-      
-      // Small delay to prevent overwhelming the channel
+
       await new Promise(resolve => setTimeout(resolve, 1));
     }
   }
 
   private setupPeerConnection(): void {
     this.peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    
-    this.peerConnection.onicecandidate = () => {
-      // ICE candidates are gathered automatically
-      // Connection continues once candidates are exchanged
-    };
-    
+
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection?.connectionState;
       switch (state) {
         case 'connected':
           this.events.onStateChange('CONNECTED');
+          this.cleanupFirebase();
           break;
         case 'disconnected':
         case 'closed':
@@ -182,18 +206,18 @@ export class P2PConnection {
     channel.onopen = () => {
       this.events.onStateChange('CONNECTED');
     };
-    
+
     channel.onmessage = (event) => {
       try {
         const message: FileChunkMessage = JSON.parse(event.data);
-        
+
         if (message.type === 'file-meta' && message.metadata) {
           this.totalChunks = message.metadata.totalChunks;
           this.fileSize = message.metadata.size;
           this.fileName = message.metadata.name;
           this.receivedChunks = [];
           this.bytesTransferred = 0;
-          
+
           this.events.onTransferProgress({
             bytesTransferred: 0,
             totalBytes: message.metadata.size,
@@ -207,24 +231,21 @@ export class P2PConnection {
             data: message.data,
             isLast: message.isLast ?? false,
           });
-          
-          // Sort chunks by index to ensure correct order
+
           this.receivedChunks.sort((a, b) => a.index - b.index);
-          
           this.bytesTransferred += message.data.length;
-          
-          // Check if we have all chunks
+
           if (message.isLast && this.receivedChunks.length === this.totalChunks) {
             this.processReceivedFile();
           }
-          
+
           this.reportProgress(this.bytesTransferred);
         }
       } catch (e) {
         console.error('Error processing message:', e);
       }
     };
-    
+
     channel.onerror = (e) => {
       this.events.onError('Data channel error');
       console.error('Data channel error:', e);
@@ -232,35 +253,32 @@ export class P2PConnection {
   }
 
   private processReceivedFile(): void {
-    // Combine all chunks in order
     const allData: number[] = [];
     for (const chunk of this.receivedChunks) {
       allData.push(...chunk.data);
     }
-    
+
     const blob = new Blob([new Uint8Array(allData)], { type: 'application/octet-stream' });
     this.events.onDataReceived(blob, this.fileName);
   }
 
   private async waitForIceGathering(): Promise<void> {
     if (!this.peerConnection) return;
-    
+
     return new Promise((resolve) => {
       if (this.peerConnection!.iceGatheringState === 'complete') {
         resolve();
         return;
       }
-      
+
       const checkState = () => {
         if (this.peerConnection!.iceGatheringState === 'complete') {
           this.peerConnection!.removeEventListener('icegatheringstatechange', checkState);
           resolve();
         }
       };
-      
+
       this.peerConnection!.addEventListener('icegatheringstatechange', checkState);
-      
-      // Timeout after 5 seconds
       setTimeout(resolve, 5000);
     });
   }
@@ -268,7 +286,7 @@ export class P2PConnection {
   private reportProgress(totalBytes: number): void {
     const elapsed = (Date.now() - this.transferStartTime) / 1000;
     const speed = elapsed > 0 ? totalBytes / elapsed : 0;
-    
+
     this.events.onTransferProgress({
       bytesTransferred: totalBytes,
       totalBytes: this.fileSize || totalBytes,
@@ -278,7 +296,14 @@ export class P2PConnection {
     });
   }
 
+  private cleanupFirebase(): void {
+    this.listeners.forEach(unsub => unsub());
+    this.listeners = [];
+    remove(ref(db, `rooms/${this.roomCode}`));
+  }
+
   close(): void {
+    this.cleanupFirebase();
     this.dataChannel?.close();
     this.peerConnection?.close();
     this.dataChannel = null;

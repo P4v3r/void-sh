@@ -111,11 +111,8 @@ function App() {
     connectionState,
     roomCode,
     isHost,
-    offerCode,
-    answerCode: p2pAnswerCode,
     startHost,
-    joinWithOfferCode,
-    completeConnection,
+    joinWithCode,
     sendFile: p2pSendFile,
     receivedFile,
     receivedFileName,
@@ -167,12 +164,8 @@ function App() {
     }
   };
   
-  const handleP2PReceive = async (offerCode: string) => {
-    await joinWithOfferCode(offerCode);
-  };
-  
-  const handleP2PComplete = async (ansCode: string) => {
-    await completeConnection(ansCode);
+  const handleP2PReceive = async (rc: string) => {
+    await joinWithCode(rc);
   };
   
   const handleP2PDisconnect = () => {
@@ -567,10 +560,9 @@ function App() {
                   <P2PSend
                     onSend={handleP2PSend}
                     isConnected={connectionState === 'CONNECTED'}
-                    connectionInfo={offerCode ? { roomCode: roomCode || '', offerCode } : null}
-                    isConnecting={connectionState === 'CONNECTING' && isHost && !offerCode}
+                    roomCode={roomCode}
+                    isConnecting={connectionState === 'CONNECTING' && isHost}
                     onStartHost={startHost}
-                    onCompleteConnection={handleP2PComplete}
                   />
                   <button
                     onClick={() => {
@@ -1001,7 +993,6 @@ function App() {
                   onReceive={handleP2PReceive}
                   isConnected={connectionState === 'CONNECTED' && !isHost}
                   isConnecting={connectionState === 'CONNECTING' && !isHost}
-                  answerCode={p2pAnswerCode}
                 />
               </div>
             </div>
