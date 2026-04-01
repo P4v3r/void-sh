@@ -124,19 +124,47 @@ function App() {
     disconnect,
   } = useP2P();
 
-  // Auto-download received file
+  // Handle received P2P file - put in decrypt panel
   useEffect(() => {
     if (receivedFile && receivedFileName) {
-      const url = URL.createObjectURL(receivedFile);
-      triggerDownload(url, receivedFileName);
-      clearReceivedFile();
+      const safeName = sanitizeFilename(receivedFileName.replace(/\.enc$/i, ''));
+      const f = new File([receivedFile], receivedFileName, { type: 'application/octet-stream' });
+      const url = null;
+      const err = null;
+      // Defer to avoid cascading render warning
+      requestAnimationFrame(() => {
+        setEncryptedFile(f);
+        setDecryptedFileName(safeName);
+        setDecryptedUrl(url);
+        setDecryptError(err);
+        clearReceivedFile();
+      });
     }
   }, [receivedFile, receivedFileName, clearReceivedFile]);
 
   const [showP2PSend, setShowP2PSend] = useState(false);
   
   const handleP2PSend = async (file: File) => {
-    await p2pSendFile(file);
+    try {
+      setEncryptProgress(0);
+      
+      const passwordToUse = usePassword ? customPassword : undefined;
+      const { encryptedBlob, keyString: usedKey } = await encryptFile(file, passwordToUse, setEncryptProgress);
+      
+      setKeyString(usedKey);
+      
+      const encryptedFileObj = new File([encryptedBlob], file.name + '.enc', { type: 'application/octet-stream' });
+      await p2pSendFile(encryptedFileObj);
+      
+      setStatus('DONE');
+      setCurrentMode('P2P');
+      setShowP2PSend(false);
+      setToast({ message: 'File sent via P2P!', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setEncryptError(err instanceof Error ? err.message : 'P2P send failed');
+      setStatus('IDLE');
+    }
   };
   
   const handleP2PReceive = async (offerCode: string) => {
@@ -526,10 +554,7 @@ function App() {
                   <button
                     disabled={!file}
                     className="flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/30 text-white font-bold text-[13px] rounded uppercase tracking-wide disabled:cursor-not-allowed"
-                    onClick={() => {
-                      setShowP2PSend(true);
-                      startHost();
-                    }}
+                    onClick={() => setShowP2PSend(true)}
                   >
                     <Wifi size={14} /> P2P Transfer
                   </button>
@@ -542,8 +567,8 @@ function App() {
                   <P2PSend
                     onSend={handleP2PSend}
                     isConnected={connectionState === 'CONNECTED'}
-                    connectionInfo={isHost ? { roomCode: roomCode || '', offerCode: offerCode || '' } : null}
-                    isConnecting={connectionState === 'CONNECTING'}
+                    connectionInfo={offerCode ? { roomCode: roomCode || '', offerCode } : null}
+                    isConnecting={connectionState === 'CONNECTING' && isHost && !offerCode}
                     onStartHost={startHost}
                     onCompleteConnection={handleP2PComplete}
                   />

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { P2PConnection, type ConnectionEvents } from '../p2p/connection';
+import { parseConnectionLink } from '../p2p/signaling';
 import type { ConnectionState, TransferProgress } from '../p2p/types';
 
 interface UseP2PResult {
@@ -11,7 +12,7 @@ interface UseP2PResult {
   offerCode: string | null;
   answerCode: string | null;
   startHost: () => Promise<{ roomCode: string; offerCode: string }>;
-  joinWithOfferCode: (code: string) => Promise<string>;
+  joinWithOfferCode: (code: string) => Promise<void>;
   completeConnection: (answerCode: string) => Promise<void>;
   sendFile: (file: File) => Promise<void>;
   receivedFile: Blob | null;
@@ -32,92 +33,73 @@ export function useP2P(): UseP2PResult {
   const [receivedFile, setReceivedFile] = useState<Blob | null>(null);
   const [receivedFileName, setReceivedFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   const connectionRef = useRef<P2PConnection | null>(null);
-  
-  const eventsRef = useRef<ConnectionEvents>({
-    onStateChange: () => {},
-    onDataReceived: () => {},
-    onTransferProgress: () => {},
-    onError: () => {},
-  });
+  const startedRef = useRef(false);
 
-  const events = useMemo(() => {
-    const handlers = {
-      onStateChange: (state: ConnectionState) => {
-        setConnectionState(state);
-        if (state === 'DISCONNECTED') {
-          setTransferProgress(null);
-        }
-      },
-      onDataReceived: (data: Blob, fileName: string) => {
-        setReceivedFile(data);
-        setReceivedFileName(fileName);
-      },
-      onTransferProgress: (progress: TransferProgress) => {
-        setTransferProgress(progress);
-      },
-      onError: (errorMsg: string) => {
-        setError(errorMsg);
-        setConnectionState('ERROR');
-      },
-    };
-    return handlers;
-  }, []);
+  const events = useMemo<ConnectionEvents>(() => ({
+    onStateChange: (state: ConnectionState) => {
+      setConnectionState(state);
+      if (state === 'DISCONNECTED') setTransferProgress(null);
+    },
+    onDataReceived: (data: Blob, fileName: string) => {
+      setReceivedFile(data);
+      setReceivedFileName(fileName);
+    },
+    onTransferProgress: (progress: TransferProgress) => {
+      setTransferProgress(progress);
+    },
+    onError: (errorMsg: string) => {
+      setError(errorMsg);
+      setConnectionState('ERROR');
+    },
+  }), []);
 
-  useEffect(() => {
-    eventsRef.current = events;
-  }, [events]);
-  
   const startHost = useCallback(async () => {
+    if (startedRef.current && connectionRef.current) {
+      return { roomCode: roomCode || '', offerCode: offerCode || '' };
+    }
     setError(null);
     setConnectionState('CONNECTING');
     setIsHost(true);
     setAnswerCode(null);
-    
+    startedRef.current = true;
+
     const connection = new P2PConnection(events);
     connectionRef.current = connection;
-    
+
     const result = await connection.createOffer();
     setRoomCode(result.roomCode);
     setOfferCode(result.offerCode);
-    
+
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   const joinWithOfferCode = useCallback(async (offerCodeStr: string) => {
+    if (startedRef.current && connectionRef.current) return;
     setError(null);
     setConnectionState('CONNECTING');
     setIsHost(false);
     setOfferCode(null);
-    
+    startedRef.current = true;
+
     const connection = new P2PConnection(events);
     connectionRef.current = connection;
-    
-    const answerRoomCode = await connection.joinWithOfferCode(offerCodeStr);
-    setRoomCode(answerRoomCode);
-    
+
+    await connection.joinWithOfferCode(offerCodeStr);
     const answer = connection.getAnswerCode();
     setAnswerCode(answer);
-    
-    return answerRoomCode;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   const completeConnection = useCallback(async (answerCodeStr: string) => {
-    if (!connectionRef.current) {
-      throw new Error('No active connection');
-    }
-    
+    if (!connectionRef.current) throw new Error('No active connection');
     await connectionRef.current.completeWithAnswerCode(answerCodeStr);
   }, []);
-  
+
   const sendFile = useCallback(async (file: File) => {
-    if (!connectionRef.current) {
-      throw new Error('No active connection');
-    }
-    
+    if (!connectionRef.current) throw new Error('No active connection');
     setTransferProgress({
       bytesTransferred: 0,
       totalBytes: file.size,
@@ -125,18 +107,18 @@ export function useP2P(): UseP2PResult {
       totalChunks: Math.ceil(file.size / (1024 * 1024)),
       speed: 0,
     });
-    
     await connectionRef.current.sendFile(file);
   }, []);
-  
+
   const clearReceivedFile = useCallback(() => {
     setReceivedFile(null);
     setReceivedFileName(null);
   }, []);
-  
+
   const disconnect = useCallback(() => {
     connectionRef.current?.close();
     connectionRef.current = null;
+    startedRef.current = false;
     setConnectionState('DISCONNECTED');
     setRoomCode(null);
     setIsHost(false);
@@ -144,30 +126,23 @@ export function useP2P(): UseP2PResult {
     setAnswerCode(null);
     setTransferProgress(null);
   }, []);
-  
+
+  // Auto-join from URL hash link
   useEffect(() => {
-    const pendingOffer = sessionStorage.getItem('pendingP2POffer');
-    if (pendingOffer) {
-      sessionStorage.removeItem('pendingP2POffer');
-      const connection = new P2PConnection(events);
-      connectionRef.current = connection;
-      setIsHost(false);
-      connection.joinWithOfferCode(pendingOffer).then((answerRoomCode) => {
-        setRoomCode(answerRoomCode);
-        setAnswerCode(connection.getAnswerCode());
-      }).catch((e) => {
-        setError(e instanceof Error ? e.message : 'Failed to join');
-      });
+    const parsed = parseConnectionLink(window.location.href);
+    if (parsed?.offerCode) {
+      window.location.hash = '';
+      joinWithOfferCode(parsed.offerCode);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   useEffect(() => {
     return () => {
       connectionRef.current?.close();
     };
   }, []);
-  
+
   return {
     connectionState,
     roomCode,
