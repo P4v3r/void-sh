@@ -146,6 +146,8 @@ function App() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [useRandomName, setUseRandomName] = useState(false);
+  const [useSteganography, setUseSteganography] = useState(false);
+  const [stegoImage, setStegoImage] = useState<File | null>(null);
 
   //const [keyToDisplay, setKeyToDisplay] = useState<string | null>(null);
   //const [autoDecrypt, setAutoDecrypt] = useState(true); // Default true
@@ -814,14 +816,47 @@ function App() {
                         </div>
                       </div>
 
-                      {/* 3. STEGANOGRAPHY (Placeholder) */}
-                      <div className="opacity-50 pointer-events-none grayscale">
+                      {/* 3. STEGANOGRAPHY */}
+                      <div>
                          <label className="text-[12px] text-emerald-100 font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
                           <Settings size={12} /> Steganography
                         </label>
-                        <div className="text-[11px] text-emerald-500/40 border border-emerald-900/30 p-2 rounded bg-black/20">
-                           [ COMING SOON ] Hide encrypted data inside images.
+                        
+                        <div
+                          className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded transition-colors"
+                          onClick={() => setUseSteganography(!useSteganography)}
+                        >
+                          <div 
+                            className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${useSteganography ? 'bg-emerald-600 border-emerald-500' : 'border-emerald-700 bg-black/30 group-hover:border-emerald-500'}`}
+                          >
+                            {useSteganography && <CheckCircle2 size={10} className="text-white" />}
+                          </div>
+                          <span className="text-[12px] text-emerald-300/80 group-hover:text-emerald-200 transition-colors select-none">
+                            Hide encrypted data inside PNG images
+                          </span>
                         </div>
+                        
+                        {useSteganography && (
+                          <div className="mt-2 ml-7 space-y-2 animate-in slide-in-from-top-2 fade-in">
+                            <p className="text-[10px] text-emerald-500/40">
+                              Select a PNG image to use as carrier (minimum 500x500px recommended)
+                            </p>
+                            <input
+                              type="file"
+                              accept="image/png"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) setStegoImage(f);
+                              }}
+                              className="text-[11px] text-emerald-400/70 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-emerald-900/30 file:text-emerald-300 file:cursor-pointer"
+                            />
+                            {stegoImage && (
+                              <p className="text-[10px] text-emerald-400/60 truncate">
+                                Carrier: {stegoImage.name}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                     </div>
