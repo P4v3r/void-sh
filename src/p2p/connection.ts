@@ -17,7 +17,7 @@ export class P2PConnection {
   private dataChannel: RTCDataChannel | null = null;
   private roomCode: string = '';
   private events: ConnectionEvents;
-  private receivedChunks: { data: number[]; isLast: boolean }[] = [];
+  private receivedChunks: { index: number; data: number[]; isLast: boolean }[] = [];
   private totalChunks: number = 0;
   private bytesTransferred: number = 0;
   private transferStartTime: number = 0;
@@ -155,7 +155,7 @@ export class P2PConnection {
   private setupPeerConnection(): void {
     this.peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     
-    this.peerConnection.onicecandidate = (_event) => {
+    this.peerConnection.onicecandidate = () => {
       // ICE candidates are gathered automatically
       // Connection continues once candidates are exchanged
     };
@@ -203,17 +203,13 @@ export class P2PConnection {
           });
         } else if (message.type === 'file-chunk' && message.data !== undefined && message.index !== undefined) {
           this.receivedChunks.push({
+            index: message.index,
             data: message.data,
             isLast: message.isLast ?? false,
           });
           
           // Sort chunks by index to ensure correct order
-          this.receivedChunks.sort((a, b) => {
-            // Find the indices
-            const aIndex = this.receivedChunks.indexOf(a);
-            const bIndex = this.receivedChunks.indexOf(b);
-            return aIndex - bIndex;
-          });
+          this.receivedChunks.sort((a, b) => a.index - b.index);
           
           this.bytesTransferred += message.data.length;
           

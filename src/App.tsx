@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Computer, Settings, Eye, EyeOff, X, Shuffle, Wifi} from 'lucide-react';
 import { encryptFile, decryptFile } from './crypto';
+import { useP2P } from './hooks/useP2P';
+import { P2PSend } from './components/P2PSend';
+import { P2PReceive } from './components/P2PReceive';
+import { P2PStatus } from './components/P2PStatus';
 import CONFIG from './config';
 import Toast from './components/Toast';
 
@@ -103,7 +107,50 @@ function App() {
   const [encryptProgress, setEncryptProgress] = useState(0);
 
   // --- P2P STATE ---
-  // TODO: Add P2P state here
+  const {
+    connectionState,
+    roomCode,
+    isHost,
+    offerCode,
+    answerCode: p2pAnswerCode,
+    startHost,
+    joinWithOfferCode,
+    completeConnection,
+    sendFile: p2pSendFile,
+    receivedFile,
+    receivedFileName,
+    transferProgress,
+    clearReceivedFile,
+    disconnect,
+  } = useP2P();
+
+  // Auto-download received file
+  useEffect(() => {
+    if (receivedFile && receivedFileName) {
+      const url = URL.createObjectURL(receivedFile);
+      triggerDownload(url, receivedFileName);
+      clearReceivedFile();
+    }
+  }, [receivedFile, receivedFileName, clearReceivedFile]);
+
+  const [showP2PSend, setShowP2PSend] = useState(false);
+  
+  const handleP2PSend = async (file: File) => {
+    await p2pSendFile(file);
+  };
+  
+  const handleP2PReceive = async (offerCode: string) => {
+    await joinWithOfferCode(offerCode);
+  };
+  
+  const handleP2PComplete = async (ansCode: string) => {
+    await completeConnection(ansCode);
+  };
+  
+  const handleP2PDisconnect = () => {
+    disconnect();
+    setShowP2PSend(false);
+  };
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
@@ -475,10 +522,40 @@ function App() {
                     <Computer size={16} /> Encrypt & Save Locally
                   </button>
 
-                  {/* P2P Transfer - Coming Soon */}
-                  <div className="flex items-center justify-center gap-2 py-3 bg-emerald-600/20 border border-emerald-700/30 text-emerald-400/50 font-bold text-[13px] rounded uppercase tracking-wide">
-                    <Wifi size={14} /> P2P Transfer - Coming Soon
-                  </div>
+                  {/* P2P Transfer */}
+                  <button
+                    disabled={!file}
+                    className="flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/30 text-white font-bold text-[13px] rounded uppercase tracking-wide disabled:cursor-not-allowed"
+                    onClick={() => {
+                      setShowP2PSend(true);
+                      startHost();
+                    }}
+                  >
+                    <Wifi size={14} /> P2P Transfer
+                  </button>
+                </div>
+              )}
+
+              {/* P2P Send Panel */}
+              {showP2PSend && (
+                <div className="mt-4 bg-black/40 border border-emerald-800 rounded-lg p-4">
+                  <P2PSend
+                    onSend={handleP2PSend}
+                    isConnected={connectionState === 'CONNECTED'}
+                    connectionInfo={isHost ? { roomCode: roomCode || '', offerCode: offerCode || '' } : null}
+                    isConnecting={connectionState === 'CONNECTING'}
+                    onStartHost={startHost}
+                    onCompleteConnection={handleP2PComplete}
+                  />
+                  <button
+                    onClick={() => {
+                      setShowP2PSend(false);
+                      disconnect();
+                    }}
+                    className="mt-2 w-full text-xs text-emerald-500/50 hover:text-emerald-300"
+                  >
+                    Close P2P
+                  </button>
                 </div>
               )}
 
@@ -890,12 +967,29 @@ function App() {
                         </button>
                       </div>
                     )}
+              </div>
 
+              {/* P2P Receive Section */}
+              <div className="mt-4 pt-4 border-t border-emerald-900/30">
+                <p className="text-[12px] text-emerald-500/60 mb-3 text-center">Or receive via P2P:</p>
+                <P2PReceive
+                  onReceive={handleP2PReceive}
+                  isConnected={connectionState === 'CONNECTED' && !isHost}
+                  isConnecting={connectionState === 'CONNECTING' && !isHost}
+                  answerCode={p2pAnswerCode}
+                />
               </div>
             </div>
           </div>
 
         </main>
+        
+        {/* P2P Status Overlay */}
+        <P2PStatus
+          state={connectionState}
+          progress={transferProgress}
+          onDisconnect={handleP2PDisconnect}
+        />
 
         {/* FOOTER INFO */}
         <footer className="mt-8 text-center opacity-60">
