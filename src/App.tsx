@@ -1,21 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Computer, Settings, Eye, EyeOff, X, Shuffle} from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Settings, Eye, EyeOff, X, Shuffle} from 'lucide-react';
 import { encryptFile, decryptFile } from './crypto';
 import CONFIG from './config';
 import Toast from './components/Toast';
 
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
-type Mode = 'LOCAL_ONLY';
-
-// --- UTILS ---
-/*const sanitizeFilename = (name: string): string => {
-  const base = name.split(/[\\/]/).pop() || 'file';
-  const withoutAccents = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-  const safe = withoutAccents.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const cleaned = safe.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-  return cleaned || 'file.bin';
-};*/
 
 const isIOSLike = (): boolean => {
   if (typeof navigator === 'undefined') return false;
@@ -42,56 +32,38 @@ const triggerDownload = (url: string, filename: string) => {
   a.remove();
 };
 
-// Sanitize filename to prevent path traversal and other issues
 const sanitizeFilename = (name: string): string => {
-  // Remove path separators
   let base = name.split(/[\\/]/).pop() || 'file';
-  
-  // Normalize unicode
   base = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-  
-  // Remove control characters and dangerous symbols
   base = base.split('').filter(char => {
     const code = char.charCodeAt(0);
-    // Allow: letters, numbers, space, hyphen, underscore, dot
-    return (code >= 32 && code !== 34 && code !== 60 && code !== 62 && 
+    return (code >= 32 && code !== 34 && code !== 60 && code !== 62 &&
             code !== 124 && code !== 127);
   }).join('');
-  
-  // Replace multiple spaces/underscores with single
   base = base.replace(/[_\s]+/g, '_').replace(/^_|_$/g, '');
-  
-  // Limit length
   const maxLength = 200;
   if (base.length > maxLength) {
     const ext = base.split('.').pop() || '';
     base = base.substring(0, maxLength - ext.length - 1) + '.' + ext;
   }
-  
   return base || 'file.bin';
 };
 
-
-
 function App() {
-
   const advancedSettingsRef = useRef<HTMLDivElement>(null);
 
-  // --- STATI ENCRYPT ---
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>('IDLE');
   const [keyCopied, setKeyCopied] = useState(false);
   const [isHoverEncrypt, setIsHoverEncrypt] = useState(false);
-  const [currentMode, setCurrentMode] = useState<Mode | null>(null);
 
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadUrlRef, setDownloadUrlRef] = useState<string | null>(null);
   const [keyString, setKeyString] = useState<string | null>(null);
   const [encryptError, setEncryptError] = useState<string | null>(null);
 
-  // --- TOAST STATE ---
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // --- STATI DECRYPT ---
   const [encryptedFile, setEncryptedFile] = useState<File | null>(null);
   const [decryptKey, setDecryptKey] = useState<string>('');
   const [decryptedUrl, setDecryptedUrl] = useState<string | null>(null);
@@ -99,40 +71,23 @@ function App() {
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [isHoverDecrypt, setIsHoverDecrypt] = useState(false);
 
-  // --- PROGRESS STATE ---
   const [encryptProgress, setEncryptProgress] = useState(0);
+  const [decrypting, setDecrypting] = useState(false);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
   const [customPassword, setCustomPassword] = useState('');
-  const [hideExtension, setHideExtension] = useState(false); // Per .bin camuffamento
-  //const [steganographyEnabled, setSteganographyEnabled] = useState(false); // Placeholder per futuro
+  const [hideExtension, setHideExtension] = useState(false);
 
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [useRandomName, setUseRandomName] = useState(false);
-  const [useSteganography, setUseSteganography] = useState(false);
-  const [stegoImage, setStegoImage] = useState<File | null>(null);
 
-  //const [keyToDisplay, setKeyToDisplay] = useState<string | null>(null);
-  //const [autoDecrypt, setAutoDecrypt] = useState(true); // Default true
-
-  // -------------------------
-  // HANDLERS ENCRYPT
-  // -------------------------
-
-  // P2P connection handling will be added in Phase 2
-
-  useEffect(() => {
-    if (showAdvanced && advancedSettingsRef.current) {
-      // Aspetta un attimo che l'animazione inizi/finisca per calcolare bene l'altezza
-      setTimeout(() => {
-        advancedSettingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-    }
-  }, [showAdvanced]);
-
+  // Revoke object URLs to prevent memory leaks
+  const revokeUrl = (url: string | null) => {
+    if (url) URL.revokeObjectURL(url);
+  };
 
   const handleDropEncrypt = (e: React.DragEvent) => {
     e.preventDefault();
@@ -153,22 +108,19 @@ function App() {
       setEncryptError(`File too large (> ${CONFIG.HARD_MAX_MB} MB).`);
       return;
     }
-    // Sanitize filename to prevent path traversal
     const safeName = sanitizeFilename(f.name);
     const safeFile = new File([f], safeName, { type: f.type });
     setFile(safeFile);
     setStatus('READY');
+    revokeUrl(downloadUrl);
     setDownloadUrl(null);
     setKeyString(null);
     setEncryptError(null);
-    setCurrentMode(null);
   };
 
-  const startEncrypt = async (mode: Mode) => {
+  const startEncrypt = async () => {
     if (!file) return;
-    setCurrentMode(mode);
 
-    // VALIDAZIONE PASSWORD CUSTOM
     if (usePassword) {
        if (!customPassword) {
          setEncryptError("Please enter a custom password.");
@@ -184,39 +136,27 @@ function App() {
       setStatus('ENCRYPTING');
       setEncryptError(null);
       setKeyCopied(false);
+      revokeUrl(downloadUrl);
 
-      // 1. Cifratura locale
-      // Passiamo customPassword solo se usePassword è true, altrimenti undefined/null
       const passwordToUse = usePassword ? customPassword : undefined;
-
       const { encryptedBlob, keyString: usedKey } = await encryptFile(file, passwordToUse, setEncryptProgress);
 
-      // Se abbiamo usato la password custom, la chiave usata è quella.
-      // Se non l'abbiamo usata, encryptFile ne ha generata una.
-      const finalKeyString = usedKey; 
-
-      setKeyString(finalKeyString);
+      setKeyString(usedKey);
       setShowPasswordText(false);
 
       const localUrl = URL.createObjectURL(encryptedBlob);
       setDownloadUrl(localUrl);
+      setDownloadUrlRef(localUrl);
 
       let finalBaseName = file.name;
 
-      // 1. Se l'utente vuole un nome casuale
       if (useRandomName) {
-        // Genera una stringa random (es. "a1b2c3d4")
-        const randomString = Math.random().toString(36).substring(2, 10); 
-        // Se vuole mantenere l'estensione originale anche col nome random:
+        const randomString = Math.random().toString(36).substring(2, 10);
         const extOriginal = file.name.split('.').pop();
         finalBaseName = `${randomString}.${extOriginal}`;
-        
-        // OPPURE: Nome totalmente random senza estensione originale (più sicuro per privacy)
-        //finalBaseName = randomString;
       }
 
       if (hideExtension) {
-        // Rimuove l'estensione originale e mette .bin
         const lastDotIndex = finalBaseName.lastIndexOf('.');
         if (lastDotIndex !== -1) {
           finalBaseName = finalBaseName.substring(0, lastDotIndex) + '.bin';
@@ -225,13 +165,11 @@ function App() {
         }
       }
 
-      // 2. Aggiunge SEMPRE .enc alla fine
       const finalFileName = `${finalBaseName}.enc`;
 
-      // AUTO DOWNLOAD + UI Success
       triggerDownload(localUrl, finalFileName);
       setStatus('DONE');
-      setShowAdvanced(false); // <--- CHIUDE LE IMPOSTAZIONI
+      setShowAdvanced(false);
 
     } catch (err: unknown) {
       console.error(err);
@@ -249,34 +187,20 @@ function App() {
   };
 
   const resetEncrypt = () => {
-    // Reset stati di base
+    revokeUrl(downloadUrl);
     setFile(null);
     setStatus('IDLE');
     setKeyCopied(false);
     setIsHoverEncrypt(false);
     setDownloadUrl(null);
+    setDownloadUrlRef(null);
     setKeyString(null);
-
-    // --- AGGIUNTO: RESET IMPOSTAZIONI ---
     setUsePassword(false);
     setCustomPassword('');
     setConfirmPassword('');
     setHideExtension(false);
-    setUseRandomName(false); // <--- Reset nome casuale
-    setShowAdvanced(false);  // <--- Chiude il menu
-};
-
-  // -------------------------
-  // HANDLERS DECRYPT
-  // -------------------------
-
-  const resetDecrypt = () => {
-    setEncryptedFile(null);
-    setDecryptKey('');
-    setDecryptedUrl(null);
-    setDecryptedFileName('decrypted');
-    setDecryptError(null);
-    setIsHoverDecrypt(false);
+    setUseRandomName(false);
+    setShowAdvanced(false);
   };
 
   const handleDropDecrypt = (e: React.DragEvent) => {
@@ -290,7 +214,13 @@ function App() {
   const handleBrowseDecrypt = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
     if (!f) {
-      resetDecrypt();
+      revokeUrl(decryptedUrl);
+      setEncryptedFile(null);
+      setDecryptKey('');
+      setDecryptedUrl(null);
+      setDecryptedFileName('decrypted');
+      setDecryptError(null);
+      setIsHoverDecrypt(false);
       return;
     }
     validateAndSetEncryptedFile(f);
@@ -301,6 +231,7 @@ function App() {
       setDecryptError(`File too large (> ${CONFIG.HARD_MAX_MB} MB).`);
       return;
     }
+    revokeUrl(decryptedUrl);
     setEncryptedFile(f);
     setDecryptedUrl(null);
     setDecryptError(null);
@@ -319,47 +250,43 @@ function App() {
     try {
       setDecryptError(null);
       setDecryptedUrl(null);
+      setDecrypting(true);
 
       const decryptedBlob = await decryptFile(encryptedFile, decryptKey);
+      revokeUrl(decryptedUrl);
       const url = URL.createObjectURL(decryptedBlob);
 
-      const originalName = encryptedFile.name.replace(/\.enc$/i, ''); // Diventa "documento.pdf"
-      setDecryptedFileName(originalName); 
-
+      const originalName = encryptedFile.name.replace(/\.enc$/i, '');
+      setDecryptedFileName(originalName);
       setDecryptedUrl(url);
 
-      // --- AUTO DOWNLOAD ---
-      triggerDownload(url, decryptedFileName);
-      
+      triggerDownload(url, originalName);
     } catch (e) {
       console.error(e);
       setDecryptError('Decryption failed. Invalid key/file.');
+    } finally {
+      setDecrypting(false);
     }
   };
 
   const handleReset = () => {
-  setFile(null);
-  setStatus('IDLE');
-  setDownloadUrl(null);
-  setKeyString(null);
-  
-  // Reset Impostazioni
-  setUsePassword(false);
-  setCustomPassword('');
-  setConfirmPassword('');
-  setHideExtension(false);
-  setShowAdvanced(false);
-};
-
-  // -------------------------
-  // UI RENDER
-  // -------------------------
+    revokeUrl(downloadUrl);
+    setFile(null);
+    setStatus('IDLE');
+    setDownloadUrl(null);
+    setDownloadUrlRef(null);
+    setKeyString(null);
+    setUsePassword(false);
+    setCustomPassword('');
+    setConfirmPassword('');
+    setHideExtension(false);
+    setShowAdvanced(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center font-mono overflow-hidden">
-      {/* Container compatto per stare in una pagina (max-w-6xl) */}
       <div className="w-full max-w-6xl px-6 py-6 transform origin-top">
-        
+
         {/* HEADER */}
         <header className="mb-6">
           <div className="flex items-baseline justify-between">
@@ -369,11 +296,11 @@ function App() {
                   void.sh
                 </span>
                 <span className="text-[12px] text-emerald-500 uppercase tracking-[0.2em] animate-pulse">
-                  _P2P Edition
+                  _secure
                 </span>
               </div>
               <p className="text-[14px] text-emerald-300/90 font-light tracking-tight mt-1">
-                &gt; P2P File Transfer. Zero Server. Zero Knowledge.
+                &gt; In-Browser Encryption. Zero Knowledge.
               </p>
             </div>
             <div className="text-right text-[12px] text-emerald-500 space-y-0.5 hidden sm:block opacity-70">
@@ -387,11 +314,11 @@ function App() {
 
         {/* MAIN GRID */}
         <main className="flex flex-col lg:flex-row gap-6">
-          
+
           {/* --- LEFT PANEL: ENCRYPT --- */}
           <div className="w-full lg:w-1/2 flex flex-col">
             <div className="bg-[#0a1219] border border-emerald-900/40 rounded-xl p-6 h-full flex flex-col shadow-2xl relative overflow-hidden min-h-[500px]">
-              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/5 to-transparent pointer-events-none"></div>
 
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <span className="text-[14px] text-emerald-400 tracking-widest font-bold">:: ENCRYPT ::</span>
@@ -407,13 +334,13 @@ function App() {
               <div className="h-px bg-emerald-900/30 mb-6 relative z-10" />
 
               {/* DROP AREA */}
-              {(status === 'IDLE') && (
+              {status === 'IDLE' && (
                 <div
                   className={`
-                    relative flex-1 flex flex-col items-center justify-center px-4 py-8 
+                    relative flex-1 flex flex-col items-center justify-center px-4 py-8
                     border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer z-10
-                    ${isHoverEncrypt 
-                      ? 'border-emerald-400 bg-emerald-500/10' 
+                    ${isHoverEncrypt
+                      ? 'border-emerald-400 bg-emerald-500/10'
                       : 'border-emerald-800/60 bg-black/20 hover:border-emerald-500/50 hover:bg-black/40'}
                   `}
                   onDragOver={(e) => { e.preventDefault(); setIsHoverEncrypt(true); }}
@@ -421,7 +348,7 @@ function App() {
                   onDrop={handleDropEncrypt}
                 >
                   <Upload className={`mb-3 ${isHoverEncrypt ? 'text-emerald-300' : 'text-emerald-500/70'}`} size={32} />
-                  
+
                   {!file ? (
                     <>
                       <p className="text-[16px] font-bold text-emerald-100">DROP FILE HERE</p>
@@ -441,35 +368,33 @@ function App() {
                 </div>
               )}
 
-              {/* ACTIONS AREA */}
+              {/* FILE INFO */}
               {file && (
                 <div className="w-full text-center relative group mb-6 animate-in zoom-in-50 duration-300">
-                  <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-3 inline-block relative pr-12 pl-4"> 
+                  <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-3 inline-block relative pr-12 pl-4">
                     <p className="font-bold truncate max-w-[200px] text-[15px] text-emerald-100">{file.name}</p>
                     <p className="text-[11px] text-emerald-500/60 mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                    
-                    <button 
+
+                    <button
                       onClick={handleReset}
                       className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 text-emerald-600 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all"
                       title="Remove file"
                     >
-                      <X size={16} /> 
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* BOTTONI AZIONE */}
+              {/* ACTION BUTTONS */}
               {(status === 'IDLE' || status === 'READY') && (
                 <div className={`mt-2 flex flex-col gap-3 z-10 transition-opacity duration-300 ${!file ? 'opacity-50 pointer-events-none grayscale' : 'opacity-100'}`}>
-                  
-                  {/* Local Save */}
                   <button
                     disabled={!file}
-                    className="flex items-center justify-center gap-2 py-3 bg-emerald-900/20 border border-emerald-700/50 hover:bg-emerald-800/40 text-emerald-100 font-bold text-[14px] rounded transition-colors uppercase disabled:cursor-not-allowed"
-                    onClick={() => startEncrypt('LOCAL_ONLY')}
+                    className="flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/30 text-white font-bold text-[14px] rounded transition-colors uppercase disabled:cursor-not-allowed"
+                    onClick={() => startEncrypt()}
                   >
-                    <Computer size={16} /> Encrypt & Save Locally
+                    <Lock size={16} /> Encrypt & Download
                   </button>
                 </div>
               )}
@@ -481,30 +406,28 @@ function App() {
                 </div>
               )}
 
-              {/* ADVANCED SETTINGS PANEL */}
+              {/* ADVANCED SETTINGS */}
               {(status === 'IDLE' || status === 'READY') && (
                 <div className="max-w-md mx-auto mt-4 mb-4 relative z-20 space-y-2">
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
                   className="flex items-center gap-2 text-[11px] text-emerald-500/70 hover:text-emerald-400 uppercase tracking-widest font-bold mx-auto transition-colors"
-                > 
+                >
                   <Settings size={12} />
                   {showAdvanced ? 'Hide Options' : 'Advanced Options'}
                 </button>
 
               {showAdvanced && (
-                  <div 
-                  ref={advancedSettingsRef} 
+                  <div
+                  ref={advancedSettingsRef}
                   className="bg-black/40 border border-emerald-900/50 rounded-xl p-6 space-y-3 animate-in slide-in-from-top-2 fade-in duration-300 backdrop-blur-md shadow-2xl">
-                      
-                     {/* 1. CUSTOM PASSWORD / KEY */}
+
                       <div>
                         <label className="text-[12px] text-emerald-100 font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
-                          <Lock size={12} /> Encryption Key / Password
+                          <Lock size={12} /> Custom Password
                         </label>
-                        
-                        {/* Checkbox per abilitare */}
-                        <div 
+
+                        <div
                           className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded transition-colors mb-2"
                           onClick={() => {
                               setUsePassword(!usePassword);
@@ -515,11 +438,10 @@ function App() {
                               {usePassword && <CheckCircle2 size={10} className="text-white" />}
                             </div>
                             <span className="text-[12px] text-emerald-300/80 group-hover:text-emerald-200 transition-colors select-none">
-                                Set Custom Password
+                                Use custom password instead of random key
                             </span>
                         </div>
 
-                        {/* Campi input password (mostrati solo se abilitato) */}
                         {usePassword && (
                           <div className="space-y-2 animate-in slide-in-from-top-2 fade-in">
                               <div className="relative">
@@ -532,32 +454,32 @@ function App() {
                                       className="w-full bg-black/40 border border-emerald-800 rounded px-3 py-2 text-[13px] text-emerald-100 focus:border-emerald-500 outline-none transition-all placeholder:text-emerald-800"
                                   />
                                   <button
+                                      type="button"
                                       onClick={() => setShowPasswordText(!showPasswordText)}
                                       className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500/50 hover:text-emerald-300"
                                   >
                                       {showPasswordText ? <EyeOff size={14} /> : <Eye size={14} />}
                                   </button>
                               </div>
-                              
+
                               <input
                                   type={showPasswordText ? "text" : "password"}
                                   placeholder="Confirm password..."
                                   value={confirmPassword}
                                   onChange={(e) => setConfirmPassword(e.target.value)}
-                                  className={`w-full bg-black/40 border rounded px-3 py-2 text-[13px] text-emerald-100 outline-none transition-all placeholder:text-emerald-800 
-                                  ${confirmPassword && customPassword !== confirmPassword 
-                                      ? 'border-red-500/50 focus:border-red-500' // Bordo Rosso se diverse
-                                      : 'border-emerald-800 focus:border-emerald-500' // Bordo Verde se ok
+                                  className={`w-full bg-black/40 border rounded px-3 py-2 text-[13px] text-emerald-100 outline-none transition-all placeholder:text-emerald-800
+                                  ${confirmPassword && customPassword !== confirmPassword
+                                      ? 'border-red-500/50 focus:border-red-500'
+                                      : 'border-emerald-800 focus:border-emerald-500'
                                   }`}
                               />
                               <p className="text-[10px] text-emerald-500/40">
-                                If disabled, a random secure key will be generated for you.
+                                If disabled, a random secure key will be generated.
                               </p>
                           </div>
                         )}
                       </div>
 
-                      {/* 1.5 RANDOM FILENAME */}
                       <div>
                         <label className="text-[12px] text-emerald-100 font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
                           <Shuffle size={12} /> Privacy
@@ -573,74 +495,29 @@ function App() {
                             {useRandomName && <CheckCircle2 size={10} className="text-white" />}
                           </div>
                           <span className="text-[12px] text-emerald-300/80 group-hover:text-emerald-200 transition-colors select-none">
-                            Use Random Filename (e.g. x8k29a.enc)
+                            Random filename (e.g. x8k29a.enc)
                           </span>
                         </div>
                       </div>
 
-                      {/* 2. FILE OBSCURITY */}
                       <div>
                         <label className="text-[12px] text-emerald-100 font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
                           <EyeOff size={12} /> Obscurity
                         </label>
-                        
-                        {/* Aggiunto onClick sul div contenitore e cursor-pointer */}
-                        <div 
+
+                        <div
                           className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded transition-colors"
                           onClick={() => setHideExtension(!hideExtension)}
                         >
-                          <div 
+                          <div
                             className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${hideExtension ? 'bg-emerald-600 border-emerald-500' : 'border-emerald-700 bg-black/30 group-hover:border-emerald-500'}`}
                           >
                             {hideExtension && <CheckCircle2 size={10} className="text-white" />}
                           </div>
                           <span className="text-[12px] text-emerald-300/80 group-hover:text-emerald-200 transition-colors select-none">
-                            Hide file extension (save as .bin)
+                            Save as .bin instead of .enc
                           </span>
                         </div>
-                      </div>
-
-                      {/* 3. STEGANOGRAPHY */}
-                      <div>
-                         <label className="text-[12px] text-emerald-100 font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
-                          <Settings size={12} /> Steganography
-                        </label>
-                        
-                        <div
-                          className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded transition-colors"
-                          onClick={() => setUseSteganography(!useSteganography)}
-                        >
-                          <div 
-                            className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${useSteganography ? 'bg-emerald-600 border-emerald-500' : 'border-emerald-700 bg-black/30 group-hover:border-emerald-500'}`}
-                          >
-                            {useSteganography && <CheckCircle2 size={10} className="text-white" />}
-                          </div>
-                          <span className="text-[12px] text-emerald-300/80 group-hover:text-emerald-200 transition-colors select-none">
-                            Hide encrypted data inside PNG images
-                          </span>
-                        </div>
-                        
-                        {useSteganography && (
-                          <div className="mt-2 ml-7 space-y-2 animate-in slide-in-from-top-2 fade-in">
-                            <p className="text-[10px] text-emerald-500/40">
-                              Select a PNG image to use as carrier (minimum 500x500px recommended)
-                            </p>
-                            <input
-                              type="file"
-                              accept="image/png"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                if (f) setStegoImage(f);
-                              }}
-                              className="text-[11px] text-emerald-400/70 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-emerald-900/30 file:text-emerald-300 file:cursor-pointer"
-                            />
-                            {stegoImage && (
-                              <p className="text-[10px] text-emerald-400/60 truncate">
-                                Carrier: {stegoImage.name}
-                              </p>
-                            )}
-                          </div>
-                        )}
                       </div>
 
                     </div>
@@ -652,12 +529,11 @@ function App() {
               {status === 'ENCRYPTING' && (
                 <div className="mt-8 flex flex-col items-center justify-center text-emerald-300 z-10">
                   <Lock size={36} className="mb-4 animate-pulse" />
-                  <p className="text-[15px] tracking-widest mb-4">ENCRYPTING_DATA...</p>
-                  
-                  {/* Progress Bar */}
+                  <p className="text-[15px] tracking-widest mb-4">ENCRYPTING...</p>
+
                   <div className="w-full max-w-xs">
                     <div className="h-2 bg-emerald-900/50 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-emerald-500 transition-all duration-300 ease-out"
                         style={{ width: `${encryptProgress}%` }}
                       />
@@ -669,42 +545,40 @@ function App() {
                 </div>
               )}
 
-
-              {/* DONE STATE: LOCAL_ONLY */}
-              {status === 'DONE' && currentMode === 'LOCAL_ONLY' && (
+              {/* DONE STATE */}
+              {status === 'DONE' && (
                 <div className="mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300 z-10">
                   <div className="flex items-center gap-2 text-emerald-300 bg-emerald-900/20 p-3 rounded border border-emerald-800/50">
                     <CheckCircle2 size={20} />
                     <p className="font-bold tracking-wide text-[14px]">ENCRYPTION SUCCESSFUL!</p>
                   </div>
                   <p className="text-[13px] text-emerald-400/70 mb-4">Download started automatically.</p>
-                  
+
                   <div className="flex justify-center w-full my-5">
                       <button
-                        onClick={() => downloadUrl && triggerDownload(downloadUrl, `${file?.name || 'file'}.enc`)}
+                        onClick={() => downloadUrlRef && triggerDownload(downloadUrlRef, `${file?.name || 'file'}.enc`)}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500/20 border border-emerald-500/50 hover:bg-emerald-500/40 text-emerald-100 rounded text-[13px] transition-colors font-bold uppercase shadow-[0_0_15px_rgba(16,185,129,0.1)]"
                       >
                         DOWNLOAD AGAIN
                       </button>
                   </div>
 
-                  {/* KEY / PASSWORD DISPLAY */}
                   {keyString && (
                     <div className="mt-4 text-left">
                       <p className="text-[12px] text-emerald-400/80 mb-1 uppercase tracking-wider font-bold flex items-center gap-2">
                         &gt; {usePassword ? 'Decryption Password' : 'Decryption Key'} <AlertTriangle size={12} className="text-yellow-500" />
                       </p>
                       <div className="flex gap-2 relative">
-                        <input 
-                          readOnly 
-                          type={usePassword && showPasswordText === false ? "password" : "text"} // Nasconde SOLO se è password E non si vuole vedere
-                          value={keyString} 
+                        <input
+                          readOnly
+                          type={usePassword && !showPasswordText ? "password" : "text"}
+                          value={keyString}
                           className="flex-1 bg-black/30 border border-emerald-800 rounded px-2 py-1 text-[12px] text-emerald-200 font-mono outline-none pr-8"
                         />
-                        
-                        {/* Toggle Visibility Button - SOLO per password */}
+
                         {usePassword && (
                           <button
+                            type="button"
                             onClick={() => setShowPasswordText(!showPasswordText)}
                             className="absolute right-[80px] top-1/2 -translate-y-1/2 text-emerald-500/50 hover:text-emerald-300 px-2"
                           >
@@ -719,18 +593,18 @@ function App() {
                           {keyCopied ? 'COPIED!' : <><Copy size={12}/> COPY</>}
                         </button>
                       </div>
-                      
+
                       <p className="text-[11px] text-emerald-500/50 mt-1 font-bold">
                         !! SAVE THIS {usePassword ? 'PASSWORD' : 'KEY'}. NO RECOVERY POSSIBLE. !!
                       </p>
                     </div>
                   )}
-                  
+
                   <button
                     className="block w-full mt-4 text-[11px] text-emerald-500/50 hover:text-emerald-300 uppercase tracking-widest"
                     onClick={resetEncrypt}
                   >
-                    [ START NEW SESSION]
+                    [ START NEW SESSION ]
                   </button>
                 </div>
               )}
@@ -740,11 +614,11 @@ function App() {
           {/* --- RIGHT PANEL: DECRYPT --- */}
           <div className="w-full lg:w-1/2 flex flex-col">
             <div className="bg-[#0a1219] border border-emerald-900/40 rounded-xl p-6 h-full flex flex-col shadow-2xl relative overflow-hidden min-h-[500px]">
-              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
-              
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/5 to-transparent pointer-events-none"></div>
+
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <span className="text-[14px] text-emerald-400 tracking-widest font-bold">:: DECRYPT ::</span>
-                <span className="text-[12px] text-emerald-600 font">[ LOCAL ]</span>
+                <span className="text-[12px] text-emerald-600">[ LOCAL ]</span>
               </div>
 
               <div className="text-[12px] space-y-1 mb-4 opacity-70 relative z-10">
@@ -753,88 +627,85 @@ function App() {
               </div>
               <div className="h-px bg-emerald-900/30 mb-6 relative z-10" />
 
-              {/* DROP AREA DECRYPT */}
-              <div>
-                {!encryptedFile && (
-                  <div
-                    className={`
-                      relative flex flex-col items-center justify-center px-4 py-10
-                      border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer mb-6
-                      ${isHoverDecrypt
-                        ? 'border-emerald-400 bg-emerald-500/10'
-                        : 'border-emerald-800/60 bg-black/20 hover:border-emerald-500/50 hover:bg-black/40'}
-                      ${decryptedUrl ? 'hidden' : 'flex'} 
-                    `}
-                    onDragOver={(e) => { e.preventDefault(); setIsHoverDecrypt(true); }}
-                    onDragLeave={() => setIsHoverDecrypt(false)}
-                    onDrop={handleDropDecrypt}
-                  >
-                    <Upload className={`mb-3 ${isHoverDecrypt ? 'text-emerald-300' : 'text-emerald-500/70'}`} size={32} />
-                    <p className="text-[16px] font-bold text-emerald-100">DROP .ENC FILE</p>
-                    <p className="text-emerald-400/60 text-[13px] mt-2">[ or click to browse ]</p>
-                    
-                    <input 
-                        type="file" 
-                        accept=".enc" // Puoi decommentare se vuoi forzare l'estensione nel dialog
-                        className="absolute inset-0 opacity-0 cursor-pointer" 
-                        onChange={handleBrowseDecrypt} 
-                    />
-                  </div>
-                )}
-              </div>
+              {/* DROP AREA */}
+              {!encryptedFile && (
+                <div
+                  className={`
+                    relative flex flex-col items-center justify-center px-4 py-10
+                    border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer mb-6
+                    ${isHoverDecrypt
+                      ? 'border-emerald-400 bg-emerald-500/10'
+                      : 'border-emerald-800/60 bg-black/20 hover:border-emerald-500/50 hover:bg-black/40'}
+                    ${decryptedUrl ? 'hidden' : 'flex'}
+                  `}
+                  onDragOver={(e) => { e.preventDefault(); setIsHoverDecrypt(true); }}
+                  onDragLeave={() => setIsHoverDecrypt(false)}
+                  onDrop={handleDropDecrypt}
+                >
+                  <Upload className={`mb-3 ${isHoverDecrypt ? 'text-emerald-300' : 'text-emerald-500/70'}`} size={32} />
+                  <p className="text-[16px] font-bold text-emerald-100">DROP .ENC FILE</p>
+                  <p className="text-emerald-400/60 text-[13px] mt-2">[ or click to browse ]</p>
 
-              {/* 2. FILE INFO (Visibile SOLO se c'è file) */}
+                  <input
+                      type="file"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={handleBrowseDecrypt}
+                  />
+                </div>
+              )}
+
+              {/* FILE INFO */}
               {encryptedFile && (
                 <div className="w-full text-center relative group mb-6 animate-in zoom-in-50 duration-300">
                   <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-3 inline-block relative pr-12 pl-4">
                     <p className="font-bold truncate max-w-[200px] text-[15px] text-emerald-100">{encryptedFile.name}</p>
                     <p className="text-[11px] text-emerald-500/60 mt-0.5">{(encryptedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                    
-                    {/* Tasto X per rimuovere */}
-                    <button 
+
+                    <button
                       onClick={() => {
+                        revokeUrl(decryptedUrl);
                         setEncryptedFile(null);
                         setDecryptedUrl(null);
                         setDecryptKey('');
-                        // Se vuoi resettare anche errori o altro aggiungilo qui
+                        setDecryptError(null);
                       }}
                       className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 text-emerald-600 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all"
                       title="Remove file"
                     >
-                      <X size={16} /> 
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* DECRYPT KEY INPUT */}
+              {/* KEY INPUT */}
               <div className="mb-4">
                   <p className="text-[12px] text-emerald-400/80 mb-2 uppercase tracking-wider font-bold">
                       Enter Decryption Key / Password
                   </p>
                   <div className="relative">
                       <input
-                          type={showPasswordText ? "text" : "password"} // Riutilizziamo lo stesso stato showPasswordText o ne crei uno nuovo locale
+                          type={showPasswordText ? "text" : "password"}
                           value={decryptKey}
                           onChange={(e) => setDecryptKey(e.target.value)}
-                          placeholder="Paste the key or enter password here..."
+                          placeholder="Paste the key or enter password..."
                           className="w-full bg-black/40 border border-emerald-800 rounded pl-3 pr-10 py-3 text-[13px] text-emerald-100 focus:border-emerald-500 outline-none transition-all font-mono shadow-inner"
                       />
-                      {/* Toggle Visibility */}
                       <button
+                          type="button"
                           onClick={() => setShowPasswordText(!showPasswordText)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500/50 hover:text-emerald-300"
                       >
                           {showPasswordText ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                   </div>
-                  {/* ACTION BUTTON: DECRYPT */}
-                    <button
+
+                  <button
                       disabled={!encryptedFile || !decryptKey}
                       onClick={handleDecrypt}
                       className="w-full mt-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/20 disabled:text-emerald-500/30 disabled:cursor-not-allowed text-black font-bold text-[14px] rounded transition-all uppercase tracking-wide flex items-center justify-center gap-2 shadow-lg hover:shadow-emerald-500/20"
                     >
-                      {status === 'ENCRYPTING' ? ( /* Ricicliamo lo stato ENCRYPTING anche per decriptare se non ne hai uno specifico */
+                      {decrypting ? (
                         <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                       ) : (
                         <>
@@ -843,7 +714,6 @@ function App() {
                       )}
                     </button>
 
-                    {/* ERROR MESSAGE */}
                     {decryptError && (
                       <div className="mt-4 bg-red-500/10 border border-red-500/50 p-3 rounded flex items-center gap-3 animate-in shake">
                         <AlertTriangle className="text-red-500 flex-shrink-0" size={16} />
@@ -851,7 +721,6 @@ function App() {
                       </div>
                     )}
 
-                    {/* SUCCESS STATE: DECRYPTED */}
                     {decryptedUrl && (
                       <div className="mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300 z-10">
                         <div className="flex items-center gap-2 text-emerald-300 bg-emerald-900/20 p-3 rounded border border-emerald-800/50">
@@ -859,7 +728,7 @@ function App() {
                           <p className="font-bold tracking-wide text-[14px]">DECRYPTION SUCCESSFUL!</p>
                         </div>
                         <p className="text-[13px] text-emerald-400/70 mb-4 mt-2">File restored successfully.</p>
-                        
+
                         <div className="flex justify-center w-full my-4">
                             <button
                               onClick={() => triggerDownload(decryptedUrl, decryptedFileName)}
@@ -872,6 +741,7 @@ function App() {
                         <button
                           className="block w-full mt-2 text-[11px] text-emerald-500/50 hover:text-emerald-300 uppercase tracking-widest"
                           onClick={() => {
+                            revokeUrl(decryptedUrl);
                             setEncryptedFile(null);
                             setDecryptedUrl(null);
                             setDecryptKey('');
@@ -887,8 +757,8 @@ function App() {
           </div>
 
         </main>
-        
-        {/* FOOTER INFO */}
+
+        {/* FOOTER */}
         <footer className="mt-8 text-center opacity-60">
            <p className="text-[12px] text-emerald-500/60 max-w-3xl mx-auto leading-relaxed font-light">
              // ZERO SERVER: FILES NEVER LEAVE YOUR BROWSER <br/>
@@ -897,7 +767,6 @@ function App() {
            </p>
         </footer>
 
-        {/* Toast Notifications */}
         {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       </div>
