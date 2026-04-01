@@ -34,7 +34,7 @@ async function deriveKeyFromPassword(password: string, salt: Uint8Array): Promis
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: new Uint8Array(salt),
       iterations: CONFIG.PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
