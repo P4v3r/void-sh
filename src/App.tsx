@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Computer, Settings, Eye, EyeOff, X, Shuffle, Wifi} from 'lucide-react';
+import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Computer, Settings, Eye, EyeOff, X, Shuffle} from 'lucide-react';
 import { encryptFile, decryptFile } from './crypto';
-import { useP2P } from './hooks/useP2P';
-import { P2PSend } from './components/P2PSend';
-import { P2PReceive } from './components/P2PReceive';
-import { P2PStatus } from './components/P2PStatus';
 import CONFIG from './config';
 import Toast from './components/Toast';
 
 
 type Status = 'IDLE' | 'READY' | 'ENCRYPTING' | 'DONE';
-type Mode = 'LOCAL_ONLY' | 'P2P';
+type Mode = 'LOCAL_ONLY';
 
 // --- UTILS ---
 /*const sanitizeFilename = (name: string): string => {
@@ -105,73 +101,6 @@ function App() {
 
   // --- PROGRESS STATE ---
   const [encryptProgress, setEncryptProgress] = useState(0);
-
-  // --- P2P STATE ---
-  const {
-    connectionState,
-    roomCode,
-    isHost,
-    startHost,
-    joinWithCode,
-    sendFile: p2pSendFile,
-    receivedFile,
-    receivedFileName,
-    transferProgress,
-    clearReceivedFile,
-    disconnect,
-  } = useP2P();
-
-  // Handle received P2P file - put in decrypt panel
-  useEffect(() => {
-    if (receivedFile && receivedFileName) {
-      const safeName = sanitizeFilename(receivedFileName.replace(/\.enc$/i, ''));
-      const f = new File([receivedFile], receivedFileName, { type: 'application/octet-stream' });
-      const url = null;
-      const err = null;
-      // Defer to avoid cascading render warning
-      requestAnimationFrame(() => {
-        setEncryptedFile(f);
-        setDecryptedFileName(safeName);
-        setDecryptedUrl(url);
-        setDecryptError(err);
-        clearReceivedFile();
-      });
-    }
-  }, [receivedFile, receivedFileName, clearReceivedFile]);
-
-  const [showP2PSend, setShowP2PSend] = useState(false);
-  
-  const handleP2PSend = async (file: File) => {
-    try {
-      setEncryptProgress(0);
-      
-      const passwordToUse = usePassword ? customPassword : undefined;
-      const { encryptedBlob, keyString: usedKey } = await encryptFile(file, passwordToUse, setEncryptProgress);
-      
-      setKeyString(usedKey);
-      
-      const encryptedFileObj = new File([encryptedBlob], file.name + '.enc', { type: 'application/octet-stream' });
-      await p2pSendFile(encryptedFileObj);
-      
-      setStatus('DONE');
-      setCurrentMode('P2P');
-      setShowP2PSend(false);
-      setToast({ message: 'File sent via P2P!', type: 'success' });
-    } catch (err) {
-      console.error(err);
-      setEncryptError(err instanceof Error ? err.message : 'P2P send failed');
-      setStatus('IDLE');
-    }
-  };
-  
-  const handleP2PReceive = async (rc: string) => {
-    await joinWithCode(rc);
-  };
-  
-  const handleP2PDisconnect = () => {
-    disconnect();
-    setShowP2PSend(false);
-  };
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
@@ -541,37 +470,6 @@ function App() {
                     onClick={() => startEncrypt('LOCAL_ONLY')}
                   >
                     <Computer size={16} /> Encrypt & Save Locally
-                  </button>
-
-                  {/* P2P Transfer */}
-                  <button
-                    disabled={!file}
-                    className="flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/30 text-white font-bold text-[13px] rounded uppercase tracking-wide disabled:cursor-not-allowed"
-                    onClick={() => setShowP2PSend(true)}
-                  >
-                    <Wifi size={14} /> P2P Transfer
-                  </button>
-                </div>
-              )}
-
-              {/* P2P Send Panel */}
-              {showP2PSend && (
-                <div className="mt-4 bg-black/40 border border-emerald-800 rounded-lg p-4">
-                  <P2PSend
-                    onSend={handleP2PSend}
-                    isConnected={connectionState === 'CONNECTED'}
-                    roomCode={roomCode}
-                    isConnecting={connectionState === 'CONNECTING' && isHost}
-                    onStartHost={startHost}
-                  />
-                  <button
-                    onClick={() => {
-                      setShowP2PSend(false);
-                      disconnect();
-                    }}
-                    className="mt-2 w-full text-xs text-emerald-500/50 hover:text-emerald-300"
-                  >
-                    Close P2P
                   </button>
                 </div>
               )}
@@ -985,34 +883,17 @@ function App() {
                       </div>
                     )}
               </div>
-
-              {/* P2P Receive Section */}
-              <div className="mt-4 pt-4 border-t border-emerald-900/30">
-                <p className="text-[12px] text-emerald-500/60 mb-3 text-center">Or receive via P2P:</p>
-                <P2PReceive
-                  onReceive={handleP2PReceive}
-                  isConnected={connectionState === 'CONNECTED' && !isHost}
-                  isConnecting={connectionState === 'CONNECTING' && !isHost}
-                />
-              </div>
             </div>
           </div>
 
         </main>
         
-        {/* P2P Status Overlay */}
-        <P2PStatus
-          state={connectionState}
-          progress={transferProgress}
-          onDisconnect={handleP2PDisconnect}
-        />
-
         {/* FOOTER INFO */}
         <footer className="mt-8 text-center opacity-60">
            <p className="text-[12px] text-emerald-500/60 max-w-3xl mx-auto leading-relaxed font-light">
              // ZERO SERVER: FILES NEVER LEAVE YOUR BROWSER <br/>
-             // ENCRYPTED PEER-TO-PEER TRANSFER <br/>
-             // LARGE FILES SUPPORTED VIA CHUNKED TRANSFER
+             // AES-256-GCM ENCRYPTION IN YOUR BROWSER <br/>
+             // SHARE .ENC FILES + KEY SEPARATELY FOR MAXIMUM SECURITY
            </p>
         </footer>
 
