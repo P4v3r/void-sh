@@ -57,18 +57,16 @@ function App() {
   useEffect(() => {
     const updateScale = () => {
       if (!wrapperRef.current) return;
-      const { width, height } = wrapperRef.current.getBoundingClientRect();
-      const scaleX = window.innerWidth / width;
-      const scaleY = window.innerHeight / height;
+      const naturalWidth = wrapperRef.current.scrollWidth;
+      const naturalHeight = wrapperRef.current.scrollHeight;
+      const scaleX = window.innerWidth / naturalWidth;
+      const scaleY = window.innerHeight / naturalHeight;
       setScale(Math.min(1.33, scaleX, scaleY));
     };
 
-    const timer = setTimeout(updateScale, 50);
+    updateScale();
     window.addEventListener('resize', updateScale);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', updateScale);
-    };
+    return () => window.removeEventListener('resize', updateScale);
   }, []);
 
   const [file, setFile] = useState<File | null>(null);
@@ -303,8 +301,8 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center font-mono overflow-auto" ref={wrapperRef}>
-      <div className="w-full max-w-6xl px-6 py-6" style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }}>
+    <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center font-mono overflow-auto">
+      <div className="w-full max-w-6xl px-6 py-6" style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }} ref={wrapperRef}>
 
         {/* HEADER */}
         <header className="mb-6">
