@@ -316,9 +316,6 @@ function App() {
 
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <span className="text-[14px] text-emerald-400 tracking-widest font-bold">:: ENCRYPT ::</span>
-                <span className="text-[12px] text-emerald-600">
-                  [{status === 'IDLE' ? ' IDLE ' : status === 'READY' ? ' READY ' : status === 'ENCRYPTING' ? ' BUSY ' : ' DONE '}]
-                </span>
               </div>
 
               <div className="text-[12px] space-y-1 mb-4 opacity-70 relative z-10">
@@ -612,7 +609,6 @@ function App() {
 
               <div className="flex items-center justify-between mb-4 relative z-10">
                 <span className="text-[14px] text-emerald-400 tracking-widest font-bold">:: DECRYPT ::</span>
-                <span className="text-[12px] text-emerald-600">[ LOCAL ]</span>
               </div>
 
               <div className="text-[12px] space-y-1 mb-4 opacity-70 relative z-10">
