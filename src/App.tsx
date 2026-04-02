@@ -284,8 +284,8 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center font-mono overflow-hidden">
-      <div className="w-full max-w-6xl px-6 py-6 transform origin-top">
+    <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center font-mono overflow-auto">
+      <div className="w-full max-w-6xl px-6 py-6" style={{ transform: 'scale(1.33)', transformOrigin: 'center center' }}>
 
         {/* HEADER */}
         <header className="mb-6">
