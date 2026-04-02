@@ -13,13 +13,23 @@ dist-ssr
 *.local
 .env
 
-# Editor directories and files
+# AI/Editor files
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# AI agent docs
+AGENTS.md
+.pi/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Deploy configs
+vercel.json
