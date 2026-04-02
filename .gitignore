@@ -1,35 +1,40 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Ignore everything by default
+*
 
-node_modules
-dist
-dist-ssr
+# Keep essential source files
+!src/
+!src/**/*
+
+# Keep public assets (except OS files)
+!public/
+public/.DS_Store
+
+# Keep entry point
+!index.html
+
+# Keep build configs
+!package.json
+!package-lock.json
+!vite.config.ts
+!tailwind.config.js
+!postcss.config.js
+!tsconfig.json
+!tsconfig.app.json
+!tsconfig.node.json
+!eslint.config.js
+
+# Keep documentation
+!README.md
+
+# Standard exclusions (generated files)
+src/.DS_Store
+node_modules/
+dist/
+dist-ssr/
 *.local
 .env
-
-# AI/Editor files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# AI agent docs
-AGENTS.md
-.pi/
-
-# OS files
+.env.*
 .DS_Store
 Thumbs.db
-
-# Deploy configs
-vercel.json
+*.log
+logs/
