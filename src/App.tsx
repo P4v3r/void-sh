@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Lock, Upload, CheckCircle2, Copy, AlertTriangle, Settings, Eye, EyeOff, X, Shuffle} from 'lucide-react';
 import { encryptFile, decryptFile } from './crypto';
 import CONFIG from './config';
@@ -51,6 +51,25 @@ const sanitizeFilename = (name: string): string => {
 
 function App() {
   const advancedSettingsRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1.33);
+
+  useEffect(() => {
+    const updateScale = () => {
+      if (!wrapperRef.current) return;
+      const { width, height } = wrapperRef.current.getBoundingClientRect();
+      const scaleX = window.innerWidth / width;
+      const scaleY = window.innerHeight / height;
+      setScale(Math.min(1.33, scaleX, scaleY));
+    };
+
+    const timer = setTimeout(updateScale, 50);
+    window.addEventListener('resize', updateScale);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateScale);
+    };
+  }, []);
 
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>('IDLE');
@@ -284,8 +303,8 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center font-mono overflow-auto">
-      <div className="w-full max-w-6xl px-6 py-6" style={{ transform: 'scale(1.33)', transformOrigin: 'center center' }}>
+    <div className="min-h-screen bg-[#050b10] text-[15px] text-emerald-100 flex items-center justify-center font-mono overflow-auto" ref={wrapperRef}>
+      <div className="w-full max-w-6xl px-6 py-6" style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }}>
 
         {/* HEADER */}
         <header className="mb-6">
