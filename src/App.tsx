@@ -140,12 +140,8 @@ function App() {
     validateAndSetFile(f);
   };
 
-  /** Validates file size and sanitizes the name before setting it. */
+  /** Validates and sanitizes the filename before setting it. */
   const validateAndSetFile = (f: File) => {
-    if (f.size > CONFIG.HARD_MAX_BYTES) {
-      setEncryptError(`File too large (maximum ${CONFIG.HARD_MAX_MB} MB).`);
-      return;
-    }
     const safeName = sanitizeFilename(f.name);
     const safeFile = new File([f], safeName, { type: f.type });
     setFile(safeFile);
@@ -274,10 +270,6 @@ function App() {
 
   /** Validates and sets the encrypted file for decryption. */
   const validateAndSetEncryptedFile = (f: File) => {
-    if (f.size > CONFIG.HARD_MAX_BYTES) {
-      setDecryptError(`File too large (maximum ${CONFIG.HARD_MAX_MB} MB).`);
-      return;
-    }
     revokeUrl(decryptedUrl);
     setEncryptedFile(f);
     setDecryptedUrl(null);

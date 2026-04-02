@@ -1,5 +1,5 @@
 // src/config.ts
-// Application constants for encryption parameters and file size limits.
+// Application constants for encryption parameters.
 
 export const CONFIG = {
   /** PBKDF2 iterations for password-based key derivation */
@@ -10,9 +10,6 @@ export const CONFIG = {
   SALT_LENGTH: 16,
   /** Chunk size for encryption: 4MB. Keeps memory usage constant regardless of file size. */
   CHUNK_SIZE: 4 * 1024 * 1024,
-  /** Maximum file size allowed: 2GB */
-  HARD_MAX_MB: 2048,
-  HARD_MAX_BYTES: 2048 * 1024 * 1024,
 } as const;
 
 export default CONFIG;
