@@ -295,19 +295,13 @@ function App() {
                 <span className="inline-block px-2 py-0.5 border border-emerald-700 text-[15px] tracking-[0.15em] uppercase font bg-emerald-900/10">
                   void.sh
                 </span>
-                <span className="text-[12px] text-emerald-500 uppercase tracking-[0.2em] animate-pulse">
-                  _secure
-                </span>
+
               </div>
               <p className="text-[14px] text-emerald-300/90 font-light tracking-tight mt-1">
                 &gt; In-Browser Encryption. Zero Knowledge.
               </p>
             </div>
-            <div className="text-right text-[12px] text-emerald-500 space-y-0.5 hidden sm:block opacity-70">
-              <p>[ CLIENT-SIDE ONLY ]</p>
-              <p>[ OPEN SOURCE ]</p>
-              <p>[ NO USER LOGS ]</p>
-            </div>
+
           </div>
           <div className="h-px bg-emerald-900/50 mt-4" />
         </header>
