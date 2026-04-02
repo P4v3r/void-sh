@@ -76,10 +76,8 @@ function App() {
     const updateScale = () => {
       if (!wrapperRef.current) return;
       const naturalWidth = wrapperRef.current.scrollWidth;
-      const naturalHeight = wrapperRef.current.scrollHeight;
       const scaleX = window.innerWidth / naturalWidth;
-      const scaleY = window.innerHeight / naturalHeight;
-      setScale(Math.min(1.33, scaleX, scaleY));
+      setScale(Math.min(1.33, scaleX));
     };
 
     updateScale();
