@@ -12,11 +12,10 @@ Stack: React 19 + TypeScript + Vite + Tailwind CSS
 void-sh/
 ├── src/
 │   ├── App.tsx          # Main UI: encrypt/decrypt panels
-│   ├── DownloadPage.tsx # Shared link download page
-│   ├── main.tsx         # React entry + Router setup
-│   ├── crypto.ts        # AES-256-GCM encryption logic
-│   ├── supabaseClient.ts
-│   └── index.css        # Tailwind imports
+│   ├── main.tsx         # React entry point
+│   ├── crypto.ts        # AES-256-GCM chunked encryption logic
+│   ├── config.ts        # Constants (chunk size, iterations, etc.)
+│   └── index.css        # Tailwind imports + base styles
 ├── public/              # Static assets
 ├── index.html           # Entry HTML
 ├── package.json
@@ -48,31 +47,23 @@ void-sh/
 *   **Style**: Tailwind CSS with emerald/terminal aesthetic
 *   **UI Pattern**: Functional components with hooks
 *   **State**: React useState/useEffect
-*   **Routing**: React Router v7
+*   **Routing**: None — single page app
 
 ## ENCRYPTION DETAILS
 
 *   **Algorithm**: AES-256-GCM via Web Crypto API
 *   **Key Derivation**: PBKDF2 for password-based encryption
 *   **Random Keys**: Generated with `crypto.getRandomValues()`
-*   **File Format**: `.enc` extension, binary blob storage
-
-## STORAGE INTEGRATIONS
-
-*   **Supabase**: File storage for share links (`vault-files` bucket)
-*   **Dropbox**: Direct upload via Dropbox SDK
-*   **Local**: Browser download for local-only mode
+*   **File Format**: `.enc` extension, chunked binary storage (4MB chunks)
+*   **Chunk Format**: Each chunk encrypted with its own IV, header stores chunk count + all IVs
 
 ## WHERE TO LOOK
 
-*   **Source**: `src/App.tsx`, `src/crypto.ts`
-*   **Download Logic**: `src/DownloadPage.tsx`
-*   **Env Vars**: `.env.local` (Supabase keys, Dropbox app key)
+*   **Source**: `src/App.tsx`, `src/crypto.ts`, `src/config.ts`
 
 ## NOTES
 
 *   **Client-side only**: All encryption happens in browser, zero server-side processing
-*   **Share Links**: Key can be embedded in URL hash (`#key`) or separate
 *   **Password Mode**: Custom passwords bypass random key generation
-*   **File Limits**: 50MB for online upload, 2GB hard limit
+*   **Large Files**: Chunked encryption keeps memory usage constant (~4MB regardless of file size)
 *   **iOS Handling**: Uses `window.open()` instead of blob download for iOS devices

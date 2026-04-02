@@ -1,73 +1,47 @@
-# React + TypeScript + Vite
+# void.sh
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+In-browser file encryption with AES-256-GCM. Zero knowledge, zero server processing.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **AES-256-GCM encryption** entirely in the browser
+- **Random keys** or **custom passwords** (PBKDF2 key derivation)
+- **Chunk-based encryption** for large files with constant memory usage (~4MB)
+- **No server-side processing** — files never leave your machine
+- **No user logs** — no tracking, no analytics
 
-## React Compiler
+## How it works
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Drop a file in the Encrypt panel
+2. Choose a random key or set a custom password
+3. Click "Encrypt & Download" — the `.enc` file downloads instantly
+4. Share the `.enc` file and the key/password separately
 
-## Expanding the ESLint configuration
+To decrypt, drop the `.enc` file in the Decrypt panel and paste the key or password.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Tech Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- React 19 + TypeScript
+- Vite 7
+- Tailwind CSS 3
+- Web Crypto API (AES-256-GCM, PBKDF2)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Getting Started
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Build
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
 ```
+
+## Security
+
+- Algorithm: AES-256-GCM via Web Crypto API
+- Key derivation: PBKDF2 with 310,000 iterations (SHA-256)
+- Large files are encrypted in 4MB chunks, each with its own IV
+- All encryption/decryption happens client-side — the server never sees your files or keys

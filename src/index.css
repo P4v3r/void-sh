@@ -2,47 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Monochrome terminal-inspired palette. [web:116][web:125] */
-:root {
-  --bg-main: #050608;
-  --bg-panel: #080a0d;
-  --border-soft: #1f2933;
-  --text-main: #e5e7eb;
-  --text-muted: #9ca3af;
-  --accent: #a3e635; /* soft terminal green */
-}
-
 body {
-  background-color: var(--bg-main);
-  color: var(--text-main);
+  background-color: #050b10;
+  color: #e5e7eb;
   font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   overflow-x: hidden;
-}
-
-/* Pannello principale, semplice */
-.panel {
-  border-radius: 0.5rem;
-  border: 1px solid var(--border-soft);
-  background-color: var(--bg-panel);
-}
-
-/* Titolo leggermente in evidenza, ma senza glow esagerato */
-.title-strong {
-  letter-spacing: -0.04em;
-}
-
-/* Cursore semplice che lampeggia */
-.cursor-blink {
-  display: inline-block;
-  width: 7px;
-  height: 1.05em;
-  background: var(--accent);
-  margin-left: 4px;
-  animation: blink 1s step-end infinite;
-  vertical-align: text-bottom;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 1; }
 }
