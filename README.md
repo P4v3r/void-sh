@@ -1,4 +1,4 @@
-# void.sh
+# VOID-SH
 
 **In-browser file encryption with AES-256-GCM.** Zero knowledge, zero server processing, zero dependencies on external services. All encryption happens entirely in your browser — your files never leave your machine.
 
