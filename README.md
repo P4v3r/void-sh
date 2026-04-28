@@ -2,8 +2,6 @@
 
 **In-browser file encryption with AES-256-GCM.** Zero knowledge, zero server processing, zero dependencies on external services. All encryption happens entirely in your browser — your files never leave your machine.
 
-![void.sh UI](./public/favicon.svg)
-
 ## Features
 
 - **AES-256-GCM encryption** — Industry-standard authenticated encryption via the Web Crypto API
@@ -92,7 +90,7 @@ Each chunk is encrypted independently with its own IV. This keeps memory usage a
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/void-sh.git
+git clone https://github.com/P4v3r/void-sh.git
 cd void-sh
 npm install
 ```
